@@ -67,6 +67,7 @@ Each device row has a `credential_ref`; the scripts read `NET_<REF>_USERNAME`, `
 | `SOPHOS` / `SOPHOSAPI` | Sophos XG SSH console / XML API (Get-only) |
 | `VCENTER` / `ESXI` | vSphere (use a read-only role) |
 | `WINDOWS` / `LINUX` | Guest operating systems (WinRM / SSH) |
+| `VEEAM` | Veeam Backup & Replication REST API (port 9419, read-only Backup Viewer role) |
 
 Hosts and IPs go in the inventory, never in `.env`.
 
