@@ -1,0 +1,12 @@
+{
+  "name": "network-ops",
+  "version": "0.1.0",
+  "description": "Approval-gated network, firewall and vSphere operations for Claude Code: inventory, read-only collection, audits, and APPROVE-gated changes.",
+  "author": {
+    "name": "Adel Abdelgawad"
+  },
+  "homepage": "https://github.com/adelabdelgawad/claudecode-for-network-plugin",
+  "repository": "https://github.com/adelabdelgawad/claudecode-for-network-plugin",
+  "license": "MIT",
+  "keywords": ["network", "cisco", "sophos", "vsphere", "change-management"]
+}

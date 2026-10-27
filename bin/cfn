@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# claude-for-network launcher: `cfn <script> [args]`, `cfn init [DIR]`, `cfn --help`. On the Bash PATH via the plugin.
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+exec bash "$here/hooks/run-python" "$here/scripts/cfn.py" "$@"

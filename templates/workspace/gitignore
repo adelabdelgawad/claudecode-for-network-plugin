@@ -1,0 +1,17 @@
+# claude-for-network site workspace — keep site data out of git.
+.env
+.env.*
+!.env.example
+inventory/*.db
+inventory/*.db-journal
+inventory/*.db.bak*
+*.db-journal
+backups/
+outputs/
+reports/
+audits/
+changes/
+CLAUDE.local.md
+.claude/approvals/
+.claude/settings.local.json
+__pycache__/

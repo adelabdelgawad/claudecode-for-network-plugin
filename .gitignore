@@ -1,0 +1,32 @@
+# This repo is the plugin source only. Site data never belongs here.
+.env
+.env.*
+!templates/workspace/.env.example
+*.db
+*.db-journal
+*.db.bak*
+backups/
+outputs/
+reports/
+audits/
+changes/
+CLAUDE.local.md
+!templates/workspace/CLAUDE.local.md
+.claude-for-network
+.claude/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

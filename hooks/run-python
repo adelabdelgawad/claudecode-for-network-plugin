@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Run a Python 3 file with whatever interpreter this machine has (Linux: python3; Windows Git Bash: python / py -3).
+# `run-python --fail-closed FILE ...` exits 2 when no Python is found, so a PreToolUse guard blocks instead of
+# silently letting the tool call through (Claude Code only blocks on exit 2).
+missing=1
+if [ "$1" = "--fail-closed" ]; then missing=2; shift; fi
+for c in python3 python; do
+  if command -v "$c" >/dev/null 2>&1 && "$c" -c "import sys; sys.exit(sys.version_info < (3, 8))" 2>/dev/null; then
+    exec "$c" "$@"
+  fi
+done
+if command -v py >/dev/null 2>&1; then exec py -3 "$@"; fi
+echo "claude-for-network: Python 3 not found on PATH" >&2
+exit "$missing"

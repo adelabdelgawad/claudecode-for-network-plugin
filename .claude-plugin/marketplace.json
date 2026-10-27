@@ -1,0 +1,14 @@
+{
+  "name": "network-ops",
+  "owner": {
+    "name": "Adel Abdelgawad"
+  },
+  "description": "Approval-gated network operations plugin for Claude Code.",
+  "plugins": [
+    {
+      "name": "network-ops",
+      "source": "./",
+      "description": "Approval-gated network, firewall and vSphere operations for Claude Code: inventory, read-only collection, audits, and APPROVE-gated changes."
+    }
+  ]
+}
