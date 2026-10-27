@@ -1,0 +1,69 @@
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-CimInstance Win32_OperatingSystem | ForEach-Object { 'OS=' + $_.Caption + ' | version=' + $_.Version + ' | build=' + $_.BuildNumber + ' | boot=' + $_.LastBootUpTime.ToString('yyyy-MM-dd') } } catch { 'ERROR: ' + $_.Exception.Message } =====
+OS=Microsoft Windows Server 2012 R2 Datacenter | version=6.3.9600 | build=9600 | boot=2026-03-02
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-HotFix | Where-Object {$_.InstalledOn -ne $null} | Sort-Object InstalledOn -Descending | Select-Object -First 5 | ForEach-Object { 'HOTFIX ' + $_.HotFixID + ' ' + $_.InstalledOn.ToString('yyyy-MM-dd') } } catch { 'ERROR: ' + $_.Exception.Message } =====
+HOTFIX KB5022352 2025-01-14
+HOTFIX KB5021294 2024-12-10
+===== FAKE-WIN2012 (192.0.2.12) :: try { 'REBOOT CBS=' + (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') + ' WU=' + (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') } catch { 'ERROR: ' + $_.Exception.Message } =====
+REBOOT CBS=True WU=False
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-MpComputerStatus -ErrorAction Stop | ForEach-Object { 'DEFENDER AMServiceEnabled=' + $_.AMServiceEnabled + ' AntivirusEnabled=' + $_.AntivirusEnabled + ' RealTimeProtectionEnabled=' + $_.RealTimeProtectionEnabled + ' SignatureAgeDays=' + $_.AntivirusSignatureAge + ' SignatureUpdated=' + $_.AntivirusSignatureLastUpdated.ToString('yyyy-MM-dd') } } catch { 'ERROR: ' + $_.Exception.Message } =====
+ERROR: The term 'Get-MpComputerStatus' is not recognized as the name of a cmdlet
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction Stop | ForEach-Object { 'AVPRODUCT name=' + $_.displayName + ' productState=' + $_.productState } } catch { 'ERROR: ' + $_.Exception.Message } =====
+ERROR: Invalid namespace 
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-NetFirewallProfile -ErrorAction Stop | ForEach-Object { 'FWPROFILE ' + $_.Name + ' Enabled=' + $_.Enabled } } catch { 'ERROR: ' + $_.Exception.Message } =====
+FWPROFILE Domain Enabled=True
+FWPROFILE Private Enabled=True
+FWPROFILE Public Enabled=False
+===== FAKE-WIN2012 (192.0.2.12) :: try { 'SMB1 EnableSMB1Protocol=' + (Get-SmbServerConfiguration -ErrorAction Stop).EnableSMB1Protocol } catch { 'SMB1 Registry=' + (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters' -ErrorAction SilentlyContinue).SMB1 } =====
+SMB1 Registry=
+===== FAKE-WIN2012 (192.0.2.12) :: try { 'RDP fDenyTSConnections=' + (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -ErrorAction Stop).fDenyTSConnections + ' UserAuthentication=' + (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name UserAuthentication -ErrorAction Stop).UserAuthentication } catch { 'ERROR: ' + $_.Exception.Message } =====
+RDP fDenyTSConnections=0 UserAuthentication=0
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-NetTCPConnection -State Listen -ErrorAction Stop | ForEach-Object { 'LISTEN ' + $_.LocalAddress + ':' + $_.LocalPort + ' pid=' + $_.OwningProcess } } catch { netstat -ano } =====
+Active Connections
+
+  Proto  Local Address          Foreign Address        State           PID
+  TCP    0.0.0.0:21             0.0.0.0:0              LISTENING       1840
+  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING       884
+  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING       4
+  TCP    0.0.0.0:3389           0.0.0.0:0              LISTENING       1120
+  TCP    127.0.0.1:1434         0.0.0.0:0              LISTENING       2210
+  TCP    [::]:445               [::]:0                 LISTENING       4
+  UDP    0.0.0.0:123            *:*                                    920
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-LocalGroupMember Administrators -ErrorAction Stop | ForEach-Object { 'ADMIN ' + $_.Name + ' | ' + $_.ObjectClass + ' | ' + $_.SID } } catch { net localgroup administrators } =====
+Alias name     administrators
+Comment        Administrators have complete and unrestricted access to the computer/domain
+
+Members
+
+-------------------------------------------------------------------------------
+Administrator
+FAKECORP\Domain Admins
+svc_backup
+The command completed successfully.
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-LocalUser -ErrorAction Stop | ForEach-Object { 'USER ' + $_.Name + ' | enabled=' + $_.Enabled + ' | pwdneverexpires=' + ($_.PasswordExpires -eq $null) + ' | lastlogon=' + $_.LastLogon + ' | sid=' + $_.SID } } catch { Get-CimInstance Win32_UserAccount -Filter 'LocalAccount=True' | ForEach-Object { 'USER ' + $_.Name + ' | enabled=' + (-not $_.Disabled) + ' | pwdneverexpires=' + (-not $_.PasswordExpires) + ' | lastlogon=unknown | sid=' + $_.SID } } =====
+USER Administrator | enabled=True | pwdneverexpires=True | lastlogon=unknown | sid=S-1-5-21-1111111111-2222222222-3333333333-500
+USER Guest | enabled=False | pwdneverexpires=True | lastlogon=unknown | sid=S-1-5-21-1111111111-2222222222-3333333333-501
+USER svc_backup | enabled=True | pwdneverexpires=True | lastlogon=unknown | sid=S-1-5-21-1111111111-2222222222-3333333333-1004
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625;StartTime=(Get-Date).AddHours(-24)} -MaxEvents 20000 -ErrorAction Stop | Measure-Object | ForEach-Object { 'FAILED_LOGONS_24H=' + $_.Count } } catch { if ($_.FullyQualifiedErrorId -like 'NoMatchingEventsFound*') { 'FAILED_LOGONS_24H=0' } else { 'ERROR: ' + $_.Exception.Message } } =====
+FAILED_LOGONS_24H=350
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625;StartTime=(Get-Date).AddHours(-24)} -MaxEvents 5000 -ErrorAction Stop | ForEach-Object { 'account=' + $_.Properties[5].Value + ' ip=' + $_.Properties[19].Value } | Group-Object | Sort-Object Count -Descending | Select-Object -First 10 | ForEach-Object { 'FAILGROUP count=' + $_.Count + ' ' + $_.Name } } catch { if ($_.FullyQualifiedErrorId -like 'NoMatchingEventsFound*') { 'FAILGROUP none' } else { 'ERROR: ' + $_.Exception.Message } } =====
+FAILGROUP count=280 account=administrator ip=198.51.100.23
+FAILGROUP count=45 account=admin ip=198.51.100.23
+FAILGROUP count=20 account=sqlsvc ip=203.0.113.77
+===== FAKE-WIN2012 (192.0.2.12) :: try { Get-CimInstance Win32_Service -Filter "StartMode='Auto' AND State='Stopped'" -ErrorAction Stop | ForEach-Object { 'STOPPED ' + $_.Name + ' | ' + $_.DisplayName + ' | exit=' + $_.ExitCode } } catch { 'ERROR: ' + $_.Exception.Message } =====
+STOPPED gupdate | Google Update Service (gupdate) | exit=0
+STOPPED sppsvc | Software Protection | exit=0
+STOPPED RemoteRegistry | Remote Registry | exit=0
+STOPPED BackupAgent | Fake Backup Agent | exit=1
+===== FAKE-WIN2012 (192.0.2.12) :: w32tm /query /status /verbose =====
+Leap Indicator: 3(not synchronized)
+Stratum: 0 (unspecified)
+Precision: -6 (15.625ms per tick)
+Root Delay: 0.0000000s
+Root Dispersion: 0.0000000s
+ReferenceId: 0x00000000 (unspecified)
+Last Successful Sync Time: unspecified
+Source: Local CMOS Clock
+Poll Interval: 10 (1024s)
+
+Phase Offset: 0.0000000s
+ClockRate: 0.0156000s

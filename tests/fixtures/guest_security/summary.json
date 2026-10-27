@@ -1,0 +1,34 @@
+[
+  {
+    "machine": "FAKE-WIN2012",
+    "ip": "192.0.2.12",
+    "os": "windows",
+    "ok": true,
+    "error": null,
+    "commands": []
+  },
+  {
+    "machine": "FAKE-WIN2019",
+    "ip": "192.0.2.19",
+    "os": "windows",
+    "ok": true,
+    "error": null,
+    "commands": []
+  },
+  {
+    "machine": "FAKE-UBU22",
+    "ip": "192.0.2.22",
+    "os": "linux",
+    "ok": true,
+    "error": null,
+    "commands": []
+  },
+  {
+    "machine": "FAKE-DOWN",
+    "ip": "192.0.2.99",
+    "os": "windows",
+    "ok": false,
+    "error": "ConnectTimeout: timeout after 30s",
+    "commands": []
+  }
+]

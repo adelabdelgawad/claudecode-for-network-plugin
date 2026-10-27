@@ -28,6 +28,7 @@ The gate is enforced by the plugin's hooks, but the rule applies even where a ho
 | `vsphere` | vCenter / ESXi / VMs / guest OS: inventory, discovery, read-only views, audits, guest commands; vSphere changes are gated |
 | `tasks` | The task list: open tasks/findings as a checklist, import findings from reports, track status |
 | `sophos-xg` | Sophos XG / SFOS firewalls: XML API (Get-only) facts, rules/NAT/objects, XML backups, rule audits |
+| `checklist` | Per-device-type checklists (every item pass/warn/crit/skip): vSphere, switches, Sophos, Veeam approved; new items or types need the user's approval first |
 | `network-workspace-init` | `setup claude for network here`: create or complete a site workspace |
 
 ## Concurrency & token use
@@ -45,13 +46,19 @@ The gate is enforced by the plugin's hooks, but the rule applies even where a ho
 | `cfn show` | Allowlisted read-only commands on targets (`--out` saves to `outputs/<ts>/`) | Read-only |
 | `cfn backup` | Running-config → `backups/<hostname>/<ts>.cfg` (Sophos → `.xml`) | Read-only |
 | `cfn sophos-api` | Sophos XG XML API, Get-only: `get` / `backup` / `facts [--update-inventory]` / `audit` | Read-only |
+| `cfn veeam-api` | Veeam B&R v12+ REST API, GET-only (`--host` required, not in the inventory): `facts` / `get` / `jobs` / `sessions` / `repos` / `report` → `reports/veeam/<ts>/`; creds `NET_VEEAM_*` | Read-only |
 | `cfn audit` | Concurrent security audit → `audits/<date>/` | Read-only |
 | `cfn log-audit` | Logging-coverage and abnormal-log audit → `reports/log_audit/<ts>/` | Read-only |
+| `cfn switch-checklist` | Switch/router checklist SW01-SW34 (Cisco IOS/IOS-XE), one concurrent show-only pass; `--from-raw DIR` re-analyzes offline → `reports/checklist/switch/<ts>/` | Read-only |
+| `cfn sophos-checklist` | Sophos XG/SFOS checklist FW01-FW27, XML API `<Get>`-only; `--from-raw DIR` re-analyzes offline → `reports/checklist/sophos/<ts>/` | Read-only |
 | `cfn change` | `plan` / `show` / `list` / `apply`; `apply` refuses without a valid user approval, backs up, pushes, verifies, logs to `change_log` | **Yes (only after `APPROVE`)** |
 | `cfn vsphere` | `add-vcenter` / `discover` / `show` snapshots, datastores, alarms, host NICs, VMs | Read-only |
 | `cfn vsphere-audit` | vSphere audit → `reports/vsphere_audit/<ts>/` | Read-only |
 | `cfn vsphere-storage` | Storage risk report → `reports/vsphere_storage/<ts>/` | Read-only |
 | `cfn guest-show` | Allowlisted read-only commands inside guest OSes (SSH / WinRM), `--preset` bundles | Read-only |
+| `cfn guest-security` | In-guest OS security audit (runs the `security` preset or parses `--from DIR`) → `reports/guest_security/<ts>/` | Read-only |
+| `cfn vsphere-checklist` | vSphere health/security checklist A01-H52 (vCenter, clusters, hosts, datastores, VM OS/security, perf, guest storage, optional Veeam coverage, merged guest security) → `reports/checklist/vsphere/<ts>/` | Read-only |
+| `cfn veeam-checklist` | Veeam B&R checklist VB01-VB20 (`--host` required, `--from-raw DIR` re-analyses saved data) → `reports/checklist/veeam/<ts>/` | Read-only |
 | `cfn tasks` | Task list: `list`, `summary`, `show`, `add`, `start` / `done` / `block` / `set`, `import` | No |
 
 All scripts share the target selectors: hostnames/IPs, `--match GLOB`, `--role`, `--all`, `--status` (default `active`). Run `cfn <name> --help`.

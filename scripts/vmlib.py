@@ -1,4 +1,4 @@
-"""Shared helpers for the READ-ONLY VMware vSphere scripts (vsphere.py, vsphere_audit.py).
+"""Shared helpers for the READ-ONLY VMware vSphere scripts (vsphere.py, vsphere_audit.py, vsphere_checklist.py).
 
 Only property retrieval and the query methods in READONLY_METHODS are ever called; nothing here can
 reconfigure, power, migrate, snapshot or otherwise change a vCenter/ESXi object.
@@ -22,7 +22,10 @@ DB = ROOT / os.getenv("INVENTORY_DB", "inventory/inventory.db")
 
 # The ONLY vSphere API methods this toolset may invoke (all read-only); call_ro() enforces it.
 READONLY_METHODS = frozenset({"RetrievePropertiesEx", "ContinueRetrievePropertiesEx", "CreateContainerView",
-                              "DestroyView", "QueryNetworkHint", "CurrentTime"})
+                              "DestroyView", "QueryNetworkHint", "CurrentTime",
+                              # performance queries (statistics reads only), used by vsphere_checklist.py
+                              "QueryPerf", "QueryPerfCounter", "QueryAvailablePerfMetric",
+                              "QueryPerfProviderSummary"})
 
 
 def timestamp():

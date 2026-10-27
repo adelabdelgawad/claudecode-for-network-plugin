@@ -1,7 +1,7 @@
 """Run STRICTLY READ-ONLY commands inside guest operating systems of inventory VMs (machines table), in parallel.
 
 Usage: cfn guest-show [NAME|HOSTNAME|IP ...] [--match GLOB] [--os windows|linux] [--role R] [--cluster C] [--all]
-           (-c CMD ... | --preset os|network|disk|services|listening|time ...) [--out] [--grep REGEX ...] [--quiet] [--timeout 30] [--workers 16]
+           (-c CMD ... | --preset os|network|disk|services|listening|time|security ...) [--out] [--grep REGEX ...] [--quiet] [--timeout 30] [--workers 16]
 
 Linux machines (mgmt_protocol ssh) use paramiko exec_command (no sudo, no pty).
 Windows machines (mgmt_protocol winrm) use pywinrm run_ps (PowerShell); port 5986 -> https.
@@ -54,6 +54,53 @@ PRESETS = {
         "linux": ["timedatectl", "chronyc tracking"],
         "windows": ["w32tm /query /status"],
     },
+    # In-guest security posture, parsed by guest_security.py. Every Windows command is wrapped in try/catch so a
+    # missing cmdlet (older PowerShell) or access error prints 'ERROR: ...' (or falls back) instead of failing the
+    # host. Windows texts are matched exactly (WIN_PRESET_TEXTS) and vetted by win_preset_problem() at import.
+    # Linux commands never use sudo, never refresh package caches (yum/dnf run cache-only with -C), and never write.
+    "security": {
+        "linux": [
+            "cat /etc/os-release",
+            "uptime",
+            "apt list --upgradable",
+            "yum -C -q updateinfo list security",
+            "dnf -C -q updateinfo list --security",
+            "cat /var/run/reboot-required",
+            "grep -E '^Start-Date' /var/log/apt/history.log | tail -n 1",
+            "rpm -qa --last | head -n 5",
+            "grep -iE '^\\s*(permitrootlogin|passwordauthentication)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf",
+            "getenforce",
+            "aa-status --enabled",
+            "cat /sys/module/apparmor/parameters/enabled",
+            "systemctl is-active firewalld ufw nftables iptables",
+            "ss -tlnp",
+            "grep -E '^(sudo|wheel|admin):' /etc/group",  # getent group sudo is blocked by the no-'sudo'-word rule
+            "lastb -n 50",
+            "journalctl -u ssh -u sshd --since '24 hours ago' --no-pager -q | grep -c 'Failed password'",
+            "journalctl -u ssh -u sshd --since '24 hours ago' --no-pager -q | grep 'Failed password' | tail -n 300",
+            "systemctl list-units --type=service --state=failed --no-pager --plain --no-legend",
+            "timedatectl",
+            "timedatectl timesync-status",
+            "chronyc tracking",
+        ],
+        "windows": [
+            r"""try { Get-CimInstance Win32_OperatingSystem | ForEach-Object { 'OS=' + $_.Caption + ' | version=' + $_.Version + ' | build=' + $_.BuildNumber + ' | boot=' + $_.LastBootUpTime.ToString('yyyy-MM-dd') } } catch { 'ERROR: ' + $_.Exception.Message }""",
+            r"""try { Get-HotFix | Where-Object {$_.InstalledOn -ne $null} | Sort-Object InstalledOn -Descending | Select-Object -First 5 | ForEach-Object { 'HOTFIX ' + $_.HotFixID + ' ' + $_.InstalledOn.ToString('yyyy-MM-dd') } } catch { 'ERROR: ' + $_.Exception.Message }""",
+            r"""try { 'REBOOT CBS=' + (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') + ' WU=' + (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') } catch { 'ERROR: ' + $_.Exception.Message }""",
+            r"""try { Get-MpComputerStatus -ErrorAction Stop | ForEach-Object { 'DEFENDER AMServiceEnabled=' + $_.AMServiceEnabled + ' AntivirusEnabled=' + $_.AntivirusEnabled + ' RealTimeProtectionEnabled=' + $_.RealTimeProtectionEnabled + ' SignatureAgeDays=' + $_.AntivirusSignatureAge + ' SignatureUpdated=' + $_.AntivirusSignatureLastUpdated.ToString('yyyy-MM-dd') } } catch { 'ERROR: ' + $_.Exception.Message }""",
+            r"""try { Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction Stop | ForEach-Object { 'AVPRODUCT name=' + $_.displayName + ' productState=' + $_.productState } } catch { 'ERROR: ' + $_.Exception.Message }""",
+            r"""try { Get-NetFirewallProfile -ErrorAction Stop | ForEach-Object { 'FWPROFILE ' + $_.Name + ' Enabled=' + $_.Enabled } } catch { 'ERROR: ' + $_.Exception.Message }""",
+            r"""try { 'SMB1 EnableSMB1Protocol=' + (Get-SmbServerConfiguration -ErrorAction Stop).EnableSMB1Protocol } catch { 'SMB1 Registry=' + (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters' -ErrorAction SilentlyContinue).SMB1 }""",
+            r"""try { 'RDP fDenyTSConnections=' + (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server' -Name fDenyTSConnections -ErrorAction Stop).fDenyTSConnections + ' UserAuthentication=' + (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name UserAuthentication -ErrorAction Stop).UserAuthentication } catch { 'ERROR: ' + $_.Exception.Message }""",
+            r"""try { Get-NetTCPConnection -State Listen -ErrorAction Stop | ForEach-Object { 'LISTEN ' + $_.LocalAddress + ':' + $_.LocalPort + ' pid=' + $_.OwningProcess } } catch { netstat -ano }""",
+            r"""try { Get-LocalGroupMember Administrators -ErrorAction Stop | ForEach-Object { 'ADMIN ' + $_.Name + ' | ' + $_.ObjectClass + ' | ' + $_.SID } } catch { net localgroup administrators }""",
+            r"""try { Get-LocalUser -ErrorAction Stop | ForEach-Object { 'USER ' + $_.Name + ' | enabled=' + $_.Enabled + ' | pwdneverexpires=' + ($_.PasswordExpires -eq $null) + ' | lastlogon=' + $_.LastLogon + ' | sid=' + $_.SID } } catch { Get-CimInstance Win32_UserAccount -Filter 'LocalAccount=True' | ForEach-Object { 'USER ' + $_.Name + ' | enabled=' + (-not $_.Disabled) + ' | pwdneverexpires=' + (-not $_.PasswordExpires) + ' | lastlogon=unknown | sid=' + $_.SID } }""",
+            r"""try { Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625;StartTime=(Get-Date).AddHours(-24)} -MaxEvents 20000 -ErrorAction Stop | Measure-Object | ForEach-Object { 'FAILED_LOGONS_24H=' + $_.Count } } catch { if ($_.FullyQualifiedErrorId -like 'NoMatchingEventsFound*') { 'FAILED_LOGONS_24H=0' } else { 'ERROR: ' + $_.Exception.Message } }""",
+            r"""try { Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625;StartTime=(Get-Date).AddHours(-24)} -MaxEvents 5000 -ErrorAction Stop | ForEach-Object { 'account=' + $_.Properties[5].Value + ' ip=' + $_.Properties[19].Value } | Group-Object | Sort-Object Count -Descending | Select-Object -First 10 | ForEach-Object { 'FAILGROUP count=' + $_.Count + ' ' + $_.Name } } catch { if ($_.FullyQualifiedErrorId -like 'NoMatchingEventsFound*') { 'FAILGROUP none' } else { 'ERROR: ' + $_.Exception.Message } }""",
+            r"""try { Get-CimInstance Win32_Service -Filter "StartMode='Auto' AND State='Stopped'" -ErrorAction Stop | ForEach-Object { 'STOPPED ' + $_.Name + ' | ' + $_.DisplayName + ' | exit=' + $_.ExitCode } } catch { 'ERROR: ' + $_.Exception.Message }""",
+            "w32tm /query /status /verbose",
+        ],
+    },
 }
 
 # ----------------------------------------------------------------------------------------------
@@ -63,6 +110,7 @@ LIN_FIRST_CMDS = {  # command -> note; each has a validator in LIN_CHECKS
     "cat", "head", "tail", "grep", "ls", "uname", "uptime", "hostname", "hostnamectl", "ip", "ss", "netstat",
     "df", "free", "lsblk", "mount", "ps", "top", "systemctl", "journalctl", "timedatectl", "chronyc", "rpm",
     "dpkg", "dmesg", "lscpu", "lspci", "ethtool", "id", "whoami", "w", "last", "date",
+    "apt", "yum", "dnf", "getenforce", "aa-status", "lastb",  # added for the security preset
 }
 LIN_PIPE_CMDS = {"grep", "head", "tail", "wc", "sort", "uniq", "cut", "column"}  # allowed after a '|'
 LIN_FORBIDDEN_CHARS = (";", "&&", "||", ">", "<", "`", "$(", "\n", "\r")
@@ -320,6 +368,27 @@ def _l_ethtool(a):
     return "ethtool: only 'ethtool IFACE' or 'ethtool -i|-S|-k IFACE'"
 
 
+def _l_apt(a):  # 'apt list --upgradable' only (reads the existing cache; never 'update'/'upgrade'/'install')
+    return None if a == ["list", "--upgradable"] else "apt: only 'apt list --upgradable' is allowed"
+
+
+def _l_yumdnf(a):  # cache-only security advisory listing; -C stops yum/dnf from refreshing (writing) the metadata cache
+    if not ({"-C", "--cacheonly"} & set(a)):
+        return "yum/dnf: -C (cache only) is required so no cache is refreshed"
+    rest = [t for t in a if t not in ("-q", "-C", "--cacheonly")]
+    return None if rest in (["updateinfo", "list", "security"], ["updateinfo", "list", "--security"]) \
+        else "yum/dnf: only 'updateinfo list security' is allowed"
+
+
+def _l_aa_status(a):
+    return None if a == ["--enabled"] else "aa-status: only --enabled is allowed"
+
+
+def _l_lastb(a):  # no -f FILE; only a line limit
+    ok = a == [] or (len(a) == 2 and a[0] == "-n" and a[1].isdigit()) or (len(a) == 1 and re.fullmatch(r"-\d+", a[0]))
+    return None if ok else "lastb: only -n N is allowed"
+
+
 LIN_CHECKS = {
     "cat": _l_cat, "head": _l_follow_free, "tail": _l_follow_free, "grep": _l_grep, "ls": _l_any,
     "uname": _l_any, "uptime": _l_any, "hostname": _l_hostname, "hostnamectl": _l_hostnamectl, "ip": _l_ip,
@@ -327,6 +396,8 @@ LIN_CHECKS = {
     "top": _l_top, "systemctl": _l_systemctl, "journalctl": _l_journalctl, "timedatectl": _l_timedatectl,
     "chronyc": _l_chronyc, "rpm": _l_rpm, "dpkg": _l_dpkg, "dmesg": _l_dmesg, "lscpu": _l_any, "lspci": _l_any,
     "ethtool": _l_ethtool, "id": _l_any, "whoami": _l_bare, "w": _l_any, "last": _l_any, "date": _l_date,
+    "apt": _l_apt, "yum": _l_yumdnf, "dnf": _l_yumdnf, "getenforce": _l_bare, "aa-status": _l_aa_status,
+    "lastb": _l_lastb,
 }
 assert set(LIN_CHECKS) == LIN_FIRST_CMDS
 
@@ -395,7 +466,13 @@ def _w_nslookup(a):
     return None if ok else "nslookup: 1-2 plain names required (bare nslookup is interactive)"
 
 
+def _w_net(a):  # 'net localgroup NAME' (list members) only; plain names exclude /add /delete
+    ok = len(a) == 2 and a[0].lower() == "localgroup" and WIN_SIMPLE_NAME.fullmatch(a[1]) and not a[1].startswith("-")
+    return None if ok else "net: only 'net localgroup NAME' is allowed"
+
+
 WIN_EXE_CHECKS = {  # non-cmdlet first tokens (lower-case)
+    "net": _w_net,
     "ipconfig": _w_ipconfig,
     "hostname": lambda a: "takes no arguments" if a else None,
     "whoami": lambda a: None if not a or [t.lower() for t in a] == ["/all"] else "whoami: bare or /all only",
@@ -410,9 +487,48 @@ WIN_EXE_CHECKS = {  # non-cmdlet first tokens (lower-case)
 WIN_PRESET_TEXTS = {c for v in PRESETS.values() for c in v["windows"]}
 
 
-def _windows_problem(cmd):
+# Preset texts use constructs the general validator rejects (try/catch, ForEach-Object blocks, string concatenation,
+# one -FilterHashtable), so they bypass it by EXACT match. win_preset_problem() is the independent vetting for those
+# constants: read-only cmdlet verbs only, no statement separators/redirects outside the one vetted hashtable form,
+# a short whitelist of method calls, and any native exe (net/netstat/w32tm) must pass the normal validator.
+WIN_PRESET_VERBS = {**WIN_CMDLET_ALLOW, "group": {"group-object"}, "foreach": {"foreach-object"}}
+WIN_PRESET_METHODS = {"ToString", "AddHours", "AddDays"}
+WIN_PRESET_WORDS = {"try", "if"} | set(WIN_EXE_CHECKS)  # words allowed in command position ('else'/'catch' follow '}')
+WIN_HASHTABLE_RE = re.compile(r"(?:\w+=(?:'[^']*'|\d+|\(Get-Date\)\.Add(?:Hours|Days)\(-\d+\))(?:;|$))+")
+
+
+def win_preset_problem(cmd):
+    """Return why a Windows preset text is not provably read-only, or None."""
+    if any(x in cmd for x in ("\n", "\r", "`", "$(", "::")) or WIN_FORBIDDEN_RE.search(cmd):
+        return "forbidden construct"
+    for ht in re.findall(r"@\{([^{}]*)\}", cmd):
+        if not WIN_HASHTABLE_RE.fullmatch(ht):
+            return f"hashtable @{{{ht}}} is not the vetted -FilterHashtable form"
+    unq = re.sub(r"@\{[^{}]*\}", "", _strip_quoted(cmd))
+    if any(ch in unq for ch in ";<>@"):
+        return "statement separator, redirect or splat outside quotes"
+    for m in re.findall(r"\.([A-Za-z_]\w*)\(", unq):
+        if m not in WIN_PRESET_METHODS:
+            return f"method call .{m}() not allowed"
+    for tok in re.findall(r"(?<![\w$.-])([A-Za-z]+-[A-Za-z0-9]+)\b", unq):
+        verb, low = tok.lower().split("-")[0], tok.lower()
+        allowed = WIN_PRESET_VERBS.get(verb, ())
+        if allowed != None and low not in allowed or low in WIN_DENY_CMDLETS:  # noqa: E711 - None means any noun
+            return f"cmdlet {tok} is not read-only"
+    for m in re.finditer(r"(?:^|[{|])\s*([A-Za-z][\w.]*)(?=\s|$)", unq):
+        if m.group(1).lower() not in WIN_PRESET_WORDS:
+            return f"'{m.group(1)}' is not an allowed command word"
+        if m.group(1).lower() in WIN_EXE_CHECKS:
+            seg = re.split(r"[}|]", unq[m.start(1):])[0]
+            p = _windows_problem(seg, allow_presets=False)
+            if p:
+                return f"{m.group(1)}: {p}"
+    return None
+
+
+def _windows_problem(cmd, allow_presets=True):
     c = cmd.strip()
-    if c in WIN_PRESET_TEXTS:
+    if allow_presets and c in WIN_PRESET_TEXTS:
         return None
     if any(x in cmd for x in WIN_FORBIDDEN_CHARS):
         return "contains a forbidden operator (newline ; > < ` $( ::)"
@@ -464,6 +580,11 @@ def _windows_problem(cmd):
         else:
             return f"'{name}' is not in the Windows read-only allowlist"
     return None
+
+
+_bad_presets = [f"{n}: {c}: {win_preset_problem(c)}" for n, v in PRESETS.items() for c in v["windows"]
+                if win_preset_problem(c)]
+assert not _bad_presets, "unvetted Windows preset text(s):\n" + "\n".join(_bad_presets)
 
 
 def readonly_problem(os_family, cmd):

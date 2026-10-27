@@ -41,6 +41,7 @@ repo is not, so develop here (not with `--plugin-dir` pointing at this repo, whi
 
   ```bash
   for t in hooks/test_change_guard.py hooks/test_site_hooks.py tests/test_paths.py tests/test_cfn.py tests/test_init_workspace.py; do python3 $t || break; done
+  .venv/bin/python tests/test_guest_security.py
   claude plugin validate .
   ```
 

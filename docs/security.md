@@ -6,7 +6,8 @@ agent can make mistakes and puts hard stops in its way.
 ## Defences
 
 1. **Read-only by default.** `show.py` enforces a command allowlist; `vmlib.call_ro()` allowlists
-   vSphere API methods; audit scripts send only `show` commands.
+   vSphere API methods (property reads plus the performance queries `QueryPerf`, `QueryPerfCounter`,
+   `QueryAvailablePerfMetric`, `QueryPerfProviderSummary`, which only read statistics); audit scripts send only `show` commands.
 2. **Human approval for every change.** Only a line the user types (`APPROVE <CHG-ID>`) creates an
    approval, which is bound to the plan's hash, single-use, and expires after 60 minutes. See
    [change-workflow.md](change-workflow.md).

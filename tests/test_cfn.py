@@ -11,7 +11,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 CFN = REPO / "bin" / "cfn"
 NAMES = ["inventory", "discover", "show", "backup", "sophos_api", "audit", "log_audit", "change", "vsphere",
-         "vsphere_audit", "vsphere_storage", "guest_show", "tasks"]
+         "vsphere_audit", "vsphere_storage", "guest_show", "tasks", "guest_security", "vsphere_checklist", "switch_checklist",
+         "sophos_checklist", "veeam_api", "veeam_checklist"]
 
 
 def cfn(args, cwd, env=None):

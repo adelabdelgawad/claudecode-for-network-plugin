@@ -24,6 +24,12 @@ RUNNABLE = {
     "vsphere_storage": "vSphere storage risk report",
     "guest_show": "allowlisted read-only commands inside guest OSes",
     "tasks": "the task list",
+    "guest_security": "in-guest OS security audit (security preset, read-only)",
+    "vsphere_checklist": "vSphere health/security checklist (approved items A01-H52)",
+    "switch_checklist": "switch/router checklist SW01-SW34 (show-only)",
+    "sophos_checklist": "Sophos XG/SFOS checklist FW01-FW27 (XML API Get-only)",
+    "veeam_api": "Veeam B&R REST API, GET-only",
+    "veeam_checklist": "Veeam B&R health/security checklist VB01-VB20",
 }
 VENV_MODULES = "import netmiko, paramiko, pyVmomi, winrm, dotenv"
 NO_VENV = "Python env not set up. Run `cfn init` (or `setup claude for network here`)."

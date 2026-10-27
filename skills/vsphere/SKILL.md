@@ -36,6 +36,8 @@ cfn guest-show -c "Get-HotFix" --match 'SMH-*' --out --quiet
 
 ## Rules
 
+- **"check vsphere X" / "check vcenter X" / "health check X" → run the approved checklist** (`checklist` skill, `cfn vsphere-checklist --vcenter X`), not an ad-hoc selection of the tools above.
+
 - **Inventory first, but ask about freshness.** Answer "which VMs/OS/where" from `inventory.py`, after asking whether to refresh first (`network-inventory` skill, "Ask before answering from stored data"). On **Refresh first**, run `vsphere.py discover [VCENTER]`; otherwise label the answer as stored data with its `updated_at`. Also run `discover` when a VM is missing.
 - **Keep output in files.** Use `--out`/`--json`/`--quiet`, then parse the files with Python and report aggregates. Bulk collection goes to a **Haiku** subagent, which returns a summary.
 - **Many VMs → one `guest_show.py` call** with selectors, never one call or subagent per VM (`network-fanout` skill).

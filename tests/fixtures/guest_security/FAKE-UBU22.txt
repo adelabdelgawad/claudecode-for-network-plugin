@@ -1,0 +1,113 @@
+===== FAKE-UBU22 (192.0.2.22) :: cat /etc/os-release =====
+PRETTY_NAME="Ubuntu 22.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="22.04"
+ID=ubuntu
+===== FAKE-UBU22 (192.0.2.22) :: uptime =====
+ 08:12:01 up 61 days,  3:11,  1 user,  load average: 0.05, 0.10, 0.08
+===== FAKE-UBU22 (192.0.2.22) :: apt list --upgradable =====
+Listing...
+libfake0/jammy-updates,jammy-security 1.0-1ubuntu1.2 amd64 [upgradable from: 1.0-1ubuntu1.1]
+libfake1/jammy-updates,jammy-security 1.1-1ubuntu1.2 amd64 [upgradable from: 1.1-1ubuntu1.1]
+libfake2/jammy-updates,jammy-security 1.2-1ubuntu1.2 amd64 [upgradable from: 1.2-1ubuntu1.1]
+libfake3/jammy-updates,jammy-security 1.3-1ubuntu1.2 amd64 [upgradable from: 1.3-1ubuntu1.1]
+libfake4/jammy-updates,jammy-security 1.4-1ubuntu1.2 amd64 [upgradable from: 1.4-1ubuntu1.1]
+libfake5/jammy-updates,jammy-security 1.5-1ubuntu1.2 amd64 [upgradable from: 1.5-1ubuntu1.1]
+libfake6/jammy-updates,jammy-security 1.6-1ubuntu1.2 amd64 [upgradable from: 1.6-1ubuntu1.1]
+libfake7/jammy-updates,jammy-security 1.7-1ubuntu1.2 amd64 [upgradable from: 1.7-1ubuntu1.1]
+libfake8/jammy-updates,jammy-security 1.8-1ubuntu1.2 amd64 [upgradable from: 1.8-1ubuntu1.1]
+libfake9/jammy-updates,jammy-security 1.9-1ubuntu1.2 amd64 [upgradable from: 1.9-1ubuntu1.1]
+libfake10/jammy-updates,jammy-security 1.10-1ubuntu1.2 amd64 [upgradable from: 1.10-1ubuntu1.1]
+libfake11/jammy-updates,jammy-security 1.11-1ubuntu1.2 amd64 [upgradable from: 1.11-1ubuntu1.1]
+libfake12/jammy-updates,jammy-security 1.12-1ubuntu1.2 amd64 [upgradable from: 1.12-1ubuntu1.1]
+libfake13/jammy-updates,jammy-security 1.13-1ubuntu1.2 amd64 [upgradable from: 1.13-1ubuntu1.1]
+libfake14/jammy-updates,jammy-security 1.14-1ubuntu1.2 amd64 [upgradable from: 1.14-1ubuntu1.1]
+libfake15/jammy-updates,jammy-security 1.15-1ubuntu1.2 amd64 [upgradable from: 1.15-1ubuntu1.1]
+libfake16/jammy-updates,jammy-security 1.16-1ubuntu1.2 amd64 [upgradable from: 1.16-1ubuntu1.1]
+libfake17/jammy-updates,jammy-security 1.17-1ubuntu1.2 amd64 [upgradable from: 1.17-1ubuntu1.1]
+libfake18/jammy-updates,jammy-security 1.18-1ubuntu1.2 amd64 [upgradable from: 1.18-1ubuntu1.1]
+libfake19/jammy-updates,jammy-security 1.19-1ubuntu1.2 amd64 [upgradable from: 1.19-1ubuntu1.1]
+libfake20/jammy-updates,jammy-security 1.20-1ubuntu1.2 amd64 [upgradable from: 1.20-1ubuntu1.1]
+libfake21/jammy-updates,jammy-security 1.21-1ubuntu1.2 amd64 [upgradable from: 1.21-1ubuntu1.1]
+libfake22/jammy-updates,jammy-security 1.22-1ubuntu1.2 amd64 [upgradable from: 1.22-1ubuntu1.1]
+htop/jammy-updates 3.0.5-7 amd64 [upgradable from: 3.0.5-6]
+tzdata/jammy-updates 2026b-0ubuntu0.22.04 all [upgradable from: 2026a-0ubuntu0.22.04][stderr]
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+===== FAKE-UBU22 (192.0.2.22) :: yum -C -q updateinfo list security =====
+[stderr]
+bash: line 1: yum: command not found
+[exit 127]
+===== FAKE-UBU22 (192.0.2.22) :: dnf -C -q updateinfo list --security =====
+[stderr]
+bash: line 1: dnf: command not found
+[exit 127]
+===== FAKE-UBU22 (192.0.2.22) :: cat /var/run/reboot-required =====
+*** System restart required ***
+===== FAKE-UBU22 (192.0.2.22) :: grep -E '^Start-Date' /var/log/apt/history.log | tail -n 1 =====
+Start-Date: 2026-08-01  06:25:11
+===== FAKE-UBU22 (192.0.2.22) :: rpm -qa --last | head -n 5 =====
+[stderr]
+bash: line 1: rpm: command not found
+[exit 127]
+===== FAKE-UBU22 (192.0.2.22) :: grep -iE '^\s*(permitrootlogin|passwordauthentication)' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf =====
+/etc/ssh/sshd_config:PermitRootLogin yes
+/etc/ssh/sshd_config:PasswordAuthentication no
+/etc/ssh/sshd_config.d/50-cloud-init.conf:PasswordAuthentication yes
+===== FAKE-UBU22 (192.0.2.22) :: getenforce =====
+[stderr]
+bash: line 1: getenforce: command not found
+[exit 127]
+===== FAKE-UBU22 (192.0.2.22) :: aa-status --enabled =====
+
+[exit 1]
+===== FAKE-UBU22 (192.0.2.22) :: cat /sys/module/apparmor/parameters/enabled =====
+N
+===== FAKE-UBU22 (192.0.2.22) :: systemctl is-active firewalld ufw nftables iptables =====
+inactive
+inactive
+inactive
+inactive
+[exit 3]
+===== FAKE-UBU22 (192.0.2.22) :: ss -tlnp =====
+State   Recv-Q  Send-Q   Local Address:Port    Peer Address:Port Process
+LISTEN  0       128            0.0.0.0:22           0.0.0.0:*
+LISTEN  0       128            0.0.0.0:23           0.0.0.0:*
+LISTEN  0       511            0.0.0.0:80           0.0.0.0:*
+LISTEN  0       100          127.0.0.1:25           0.0.0.0:*
+LISTEN  0       128               [::]:22              [::]:*
+===== FAKE-UBU22 (192.0.2.22) :: grep -E '^(sudo|wheel|admin):' /etc/group =====
+sudo:x:27:ubuntu,deploy
+===== FAKE-UBU22 (192.0.2.22) :: lastb -n 50 =====
+[stderr]
+lastb: cannot open /var/log/btmp: Permission denied
+[exit 1]
+===== FAKE-UBU22 (192.0.2.22) :: journalctl -u ssh -u sshd --since '24 hours ago' --no-pager -q | grep -c 'Failed password' =====
+214
+===== FAKE-UBU22 (192.0.2.22) :: journalctl -u ssh -u sshd --since '24 hours ago' --no-pager -q | grep 'Failed password' | tail -n 300 =====
+Oct 26 03:10:00 fake-ubu22 sshd[3000]: Failed password for invalid user admin from 192.0.2.44 port 5022 ssh2
+Oct 26 03:11:00 fake-ubu22 sshd[3001]: Failed password for root from 203.0.113.5 port 5122 ssh2
+Oct 26 03:12:00 fake-ubu22 sshd[3002]: Failed password for root from 203.0.113.5 port 5222 ssh2
+Oct 26 03:13:00 fake-ubu22 sshd[3003]: Failed password for invalid user admin from 203.0.113.5 port 5322 ssh2
+Oct 26 03:14:00 fake-ubu22 sshd[3004]: Failed password for root from 192.0.2.44 port 5422 ssh2
+Oct 26 04:10:00 fake-ubu22 sshd[3000]: Failed password for invalid user admin from 192.0.2.44 port 5022 ssh2
+Oct 26 04:11:00 fake-ubu22 sshd[3001]: Failed password for root from 203.0.113.5 port 5122 ssh2
+Oct 26 04:12:00 fake-ubu22 sshd[3002]: Failed password for root from 203.0.113.5 port 5222 ssh2
+Oct 26 04:13:00 fake-ubu22 sshd[3003]: Failed password for invalid user admin from 203.0.113.5 port 5322 ssh2
+Oct 26 04:14:00 fake-ubu22 sshd[3004]: Failed password for root from 192.0.2.44 port 5422 ssh2
+===== FAKE-UBU22 (192.0.2.22) :: systemctl list-units --type=service --state=failed --no-pager --plain --no-legend =====
+apt-daily-upgrade.service loaded failed failed Daily apt upgrade and clean activities
+===== FAKE-UBU22 (192.0.2.22) :: timedatectl =====
+               Local time: Tue 2026-10-27 08:12:05 UTC
+           Universal time: Tue 2026-10-27 08:12:05 UTC
+                 Time zone: Etc/UTC (UTC, +0000)
+System clock synchronized: no
+              NTP service: inactive
+          RTC in local TZ: no
+===== FAKE-UBU22 (192.0.2.22) :: timedatectl timesync-status =====
+[stderr]
+Failed to query server: Could not activate remote peer.
+[exit 1]
+===== FAKE-UBU22 (192.0.2.22) :: chronyc tracking =====
+[stderr]
+bash: line 1: chronyc: command not found
+[exit 127]

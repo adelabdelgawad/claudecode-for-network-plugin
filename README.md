@@ -61,9 +61,13 @@ The first setup on a machine also builds one shared Python environment for every
   rule audits, vSphere snapshots/storage, with JSON/CSV/Markdown reports.
 - **Approval-gated changes** — `plan → APPROVE → apply` with hash-bound, single-use approvals, automatic pre-change
   backups, verify commands, rollback files and a change log.
+- **Checklists** — approved, fixed item lists per device type (vSphere, Cisco switches, Sophos XG, Veeam B&R); every
+  item is reported pass/warn/crit/skip on each run. Ask *"check vsphere vc01"* or *"check switches"*.
+- **Veeam B&R and in-guest security** — read-only Veeam REST API reports and backup-coverage checks, plus an in-guest
+  OS security audit (patches, antivirus, firewall, risky services, local admins) over WinRM/SSH.
 - **Task list** — audit findings become tracked tasks (severity, status, owner, due date). Ask *"show my tasks"*.
-- **8 skills** that teach Claude the change workflow, read-only collection, inventory lookups, multi-device fan-out,
-  Sophos XG, vSphere, the task list, and site setup.
+- **9 skills** that teach Claude the change workflow, read-only collection, inventory lookups, multi-device fan-out,
+  Sophos XG, vSphere, checklists, the task list, and site setup.
 
 ## Quick Start
 

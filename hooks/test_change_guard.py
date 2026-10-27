@@ -108,7 +108,62 @@ def main():
              run(root, "Bash", {"command": 'cfn change plan --title t -c "interface Gi1/0/1" SW-ACCESS-01'}), "ALLOW"),
             ("cfn show read-only", run(root, "Bash", {"command": 'cfn show -c "show version" --all'}), "ALLOW"),
         ]
+        # remote-shell tools and IOS command words: blocked when used, allowed when only named or parsed
+        py, sh = str(root / "x.py"), str(root / "a.sh")
+        for name, tool, tin, want in [
+            ("bash: telnet <ip>", "Bash", {"command": "telnet 192.0.2.1 23"}, "BLOCK"),
+            ("bash: chained telnet", "Bash", {"command": "ls; telnet 192.0.2.1"}, "BLOCK"),
+            ("bash: piped plink", "Bash", {"command": "echo y | plink -ssh admin@192.0.2.1"}, "BLOCK"),
+            ("bash: sudo -u x telnet", "Bash", {"command": "sudo -u x telnet sw1"}, "BLOCK"),
+            ("bash: timeout 5 /usr/bin/telnet", "Bash", {"command": "timeout 5 /usr/bin/telnet sw1"}, "BLOCK"),
+            ("bash: sshpass", "Bash", {"command": "sshpass -p x ssh admin@sw1"}, "BLOCK"),
+            ("bash: bash -c 'telnet'", "Bash", {"command": "bash -c 'telnet 192.0.2.1'"}, "BLOCK"),
+            ("bash: $(telnet)", "Bash", {"command": "x=$(telnet sw1)"}, "BLOCK"),
+            ("bash: python telnetlib", "Bash", {"command": "python3 -c 'import telnetlib'"}, "BLOCK"),
+            ("bash: heredoc line telnet", "Bash", {"command": "cat > a.sh <<EOF\ntelnet 192.0.2.1\nEOF"}, "BLOCK"),
+            ("bash: reload still blocked", "Bash", {"command": "echo reload | python3 x.py"}, "BLOCK"),
+            ("bash: grep for telnet", "Bash", {"command": "grep -n \"telnet\" scripts/guest_show.py"}, "ALLOW"),
+            ("file: import telnetlib", "Write", {"file_path": py, "content": "import telnetlib\n"}, "BLOCK"),
+            ("file: netmiko cisco_ios_telnet", "Write",
+             {"file_path": py, "content": "d = {'device_type': 'cisco_ios_telnet'}"}, "BLOCK"),
+            ("file: subprocess argv", "Write", {"file_path": py, "content": "subprocess.run(['telnet', host])"}, "BLOCK"),
+            ("file: os.system string", "Write", {"file_path": py, "content": "os.system('telnet 192.0.2.1')"}, "BLOCK"),
+            ("file: f-string command", "Write", {"file_path": py, "content": "cmd = f\"telnet {host}\""}, "BLOCK"),
+            ("file: shell=True string w/ chain", "Write",
+             {"file_path": py, "content": "subprocess.run('ls; telnet 192.0.2.1', shell=True)"}, "BLOCK"),
+            ("file: plink user@host string", "Write", {"file_path": py, "content": "c = 'plink admin@sw1'"}, "BLOCK"),
+            ("file: .sh line", "Write", {"file_path": sh, "content": "#!/bin/sh\ntelnet 192.0.2.1\n"}, "BLOCK"),
+            ("file: extensionless script line", "Write",
+             {"file_path": str(root / "bin/connect"), "content": "#!/bin/sh\nexec telnet sw1\n"}, "BLOCK"),
+            ("file: send_command('reload')", "Write", {"file_path": py, "content": "conn.send_command('reload')"}, "BLOCK"),
+            ("file: no shutdown in a command list", "Write",
+             {"file_path": py, "content": "cmds = ['interface Gi1/0/1', 'no shutdown']"}, "BLOCK"),
+            ("file: ' shutdown' literal", "Write", {"file_path": py, "content": "cmds.append(' shutdown')"}, "BLOCK"),
+            ("file: conf t via timing", "Write", {"file_path": py, "content": "c.send_command_timing(\"conf t\")"}, "BLOCK"),
+            ("file: f-string reload in", "Write", {"file_path": py, "content": "x = f\"reload in {m}\""}, "BLOCK"),
+            ("file: wr mem literal", "Write", {"file_path": py, "content": "c.send_command('write memory')"}, "BLOCK"),
+            ("file: send_config_set still blocked", "Write", {"file_path": py, "content": "c.send_config_set(x)"}, "BLOCK"),
+            ("file: .sh shutdown", "Write", {"file_path": sh, "content": "printf 'shutdown\\n'\n"}, "BLOCK"),
+            ("file: check title naming telnet", "Write",
+             {"file_path": py, "content": "TITLE = 'Risky services (SMBv1, RDP without NLA, telnet, ftp)'\n"}, "ALLOW"),
+            ("file: regex alternation + port map", "Write",
+             {"file_path": py, "content": "RISKY_RE = re.compile(r'(ftp|telnet|rsh)')\nPORTS = {21: 'ftp', 23: 'telnet'}\n"},
+             "ALLOW"),
+            ("file: reload-reason title + regex", "Write",
+             {"file_path": py, "content": "TITLE = 'Uptime; last reload reason'\nRE = re.compile(r'Last reload reason: (.+)')\n"},
+             "ALLOW"),
+            ("file: env-state regex with shutdown", "Write",
+             {"file_path": py, "content": "BAD = re.compile(r'(shutdown|critical|faulty)', re.I)  # PSU shutdown state\n"},
+             "ALLOW"),
+            ("file: show reload literal", "Write", {"file_path": py, "content": "conn.send_command('show reload')"}, "ALLOW"),
+        ]:
+            cases.append((name, run(root, tool, tin), want))
+        other = root / "other-repo" / "hooks" / "change_guard.py"
+        cases.append(("other repo's guard file, no GUARD-EDIT",
+                      run(root, "Edit", {"file_path": str(other), "new_string": "x = 1"}), "BLOCK"))
         approve(root, "GUARD-EDIT")
+        cases.append(("other repo's guard file, GUARD-EDIT valid",
+                      run(root, "Edit", {"file_path": str(other), "new_string": "PUSH = ['send_config_set']"}), "ALLOW"))
         cases.append(("edit protected hook with GUARD-EDIT",
                       run(root, "Edit", {"file_path": str(PLUGIN / "hooks/change_guard.py"), "new_string": "x"}),
                       "ALLOW"))
