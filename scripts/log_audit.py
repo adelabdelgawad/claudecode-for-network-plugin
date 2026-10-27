@@ -26,6 +26,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from netmiko import ConnectHandler
 
+import netlib
 import paths
 
 ROOT = paths.site_root()
@@ -57,22 +58,12 @@ def redact(text):
 
 def collect(dev, stamp_dir):
     host = dev["hostname"]
-    cred = dev["credential_ref"] or "DEFAULT"
     res = {"hostname": host, "ip": dev["mgmt_ip"], "model": dev["model"], "os_version": dev["os_version"],
            "os_type": dev["os_type"], "outputs": OrderedDict(), "cmd_errors": {}, "connect_error": None,
            "error_kind": None}
-    params = {
-        "device_type": dev["os_type"] or "cisco_ios",
-        "host": dev["mgmt_ip"],
-        "username": os.getenv(f"NET_{cred}_USERNAME"),
-        "password": os.getenv(f"NET_{cred}_PASSWORD"),
-        "secret": os.getenv(f"NET_{cred}_ENABLE") or "",
-        "conn_timeout": 20,
-        "auth_timeout": 25,
-        "banner_timeout": 25,
-        "global_delay_factor": 1,
-    }
     try:
+        params = netlib.conn_params(dev)
+        params.update({"conn_timeout": 20, "auth_timeout": 25, "banner_timeout": 25, "global_delay_factor": 1})
         with ConnectHandler(**params) as conn:
             if params["secret"] and not conn.check_enable_mode():
                 conn.enable()

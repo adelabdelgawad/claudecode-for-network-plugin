@@ -14,6 +14,7 @@ DB = ROOT / os.getenv("INVENTORY_DB", "inventory/inventory.db")
 
 READONLY_PREFIXES = ("show ", "display ", "get ", "ping ", "traceroute ", "more ")
 _BAD_PIPE = re.compile(r"\|\s*(redirect|tee|append)\b", re.IGNORECASE)
+SSH_PORT, TELNET_PORT = 22, 23   # devices.port: 23 = managed over telnet (no SSH on the device)
 
 
 def timestamp():
@@ -103,6 +104,14 @@ def resolve_targets(args):
     return sorted(chosen.values(), key=lambda r: r["hostname"] or "")
 
 
+def netmiko_type(os_type, port):
+    """Netmiko device_type for a platform and management port; port 23 selects the telnet driver."""
+    dtype = os_type or "cisco_ios"
+    if port == TELNET_PORT and not dtype.endswith("_telnet"):
+        dtype += "_telnet"
+    return dtype
+
+
 def conn_params(dev):
     ref = dev.get("credential_ref") or "DEFAULT"
     user = os.getenv(f"NET_{ref}_USERNAME")
@@ -110,10 +119,11 @@ def conn_params(dev):
     for name, val in ((f"NET_{ref}_USERNAME", user), (f"NET_{ref}_PASSWORD", pw)):
         if not val:
             raise RuntimeError(f"missing credential env var {name}")
+    port = dev.get("port") or SSH_PORT
     return {
-        "device_type": dev.get("os_type") or "cisco_ios",
+        "device_type": netmiko_type(dev.get("os_type"), port),
         "host": dev["mgmt_ip"],
-        "port": dev.get("port") or 22,
+        "port": port,
         "username": user,
         "password": pw,
         "secret": os.getenv(f"NET_{ref}_ENABLE") or "",

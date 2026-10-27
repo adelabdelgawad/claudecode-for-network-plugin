@@ -45,7 +45,7 @@ def main():
                       SETTINGS))
         marker = json.loads((site / ".claude-for-network").read_text())
         cases.append(("marker names the plugin and version", (marker["plugin"], marker["version"]),
-                      ("network-ops", "0.2.0")))
+                      ("network-ops", "0.2.1")))
         cases.append(("CLAUDE.local.md holds no data rows", "10." in (site / "CLAUDE.local.md").read_text(), False))
 
         before = snapshot(site)

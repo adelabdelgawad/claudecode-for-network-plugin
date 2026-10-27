@@ -73,7 +73,8 @@ Hosts and IPs go in the inventory, never in `.env`.
 
 ## 4. Discover devices
 
-Read-only: an SSH port sweep plus `show version`, upserted into the site inventory.
+Read-only: an SSH port sweep (telnet when a device has no SSH) plus `show version`, upserted into the site
+inventory with the port that answered.
 
 ```bash
 cfn discover 192.0.2.0/24 --cred DEFAULT

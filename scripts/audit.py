@@ -19,6 +19,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from netmiko import ConnectHandler
 
+import netlib
 import paths
 
 ROOT = paths.site_root()
@@ -312,18 +313,9 @@ def analyze(dev, o):
 
 def audit_device(dev, outroot):
     host = dev["hostname"]
-    cred = dev["credential_ref"] or "DEFAULT"
-    params = {
-        "device_type": dev["os_type"] or "cisco_ios",
-        "host": dev["mgmt_ip"],
-        "username": os.getenv(f"NET_{cred}_USERNAME"),
-        "password": os.getenv(f"NET_{cred}_PASSWORD"),
-        "secret": os.getenv(f"NET_{cred}_ENABLE") or "",
-        "conn_timeout": 15,
-        "auth_timeout": 20,
-    }
     outputs, cmd_errors = {}, {}
     try:
+        params = netlib.conn_params(dev)
         with ConnectHandler(**params) as conn:
             if params["secret"] and not conn.check_enable_mode():
                 conn.enable()

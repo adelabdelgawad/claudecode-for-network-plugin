@@ -10,7 +10,7 @@ The plugin (`network-ops`) loads the full rules at session start, including the 
 |---|---|
 | `cfn --help` | list every script |
 | `cfn inventory list` / `counts` | read the site inventory |
-| `cfn discover 192.0.2.0/24` | SSH sweep + `show version`, upserts the inventory |
+| `cfn discover 192.0.2.0/24` | SSH sweep (telnet fallback) + `show version`, upserts the inventory |
 | `cfn show -c "show version" --all --out` | read-only collection, saved under `outputs/` |
 | `cfn backup --all` | running-config backups under `backups/` |
 | `cfn vsphere-checklist` / `switch-checklist` / `sophos-checklist` / `veeam-checklist` | read-only per-device-type checklists (`checklist` skill), reports under `reports/checklist/` |

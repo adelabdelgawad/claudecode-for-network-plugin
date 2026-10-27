@@ -1,6 +1,6 @@
 {
   "name": "network-ops",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Approval-gated network, firewall and vSphere operations for Claude Code: inventory, read-only collection, audits, and APPROVE-gated changes.",
   "author": {
     "name": "Adel Abdelgawad"

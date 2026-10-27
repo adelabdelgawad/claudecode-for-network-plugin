@@ -38,8 +38,13 @@ inventory.py vcenters [--json]
 discover.py 192.0.2.0/24 [192.0.2.13 ...] [--cred DEFAULT] [--workers 32]
 ```
 
-SSH port sweep, then `show version`. Upserts by `mgmt_ip` (hostname, model, serial, os_type,
-os_version). Credential rejections are stored as `auth_failed` with the SSH banner in `notes`.
+Port sweep (SSH 22 first, telnet 23 when SSH is closed), then `show version`. Upserts by `mgmt_ip` (hostname,
+model, serial, os_type, os_version, port). Credential rejections are stored as `auth_failed` with the SSH banner in
+`notes`.
+
+`devices.port` selects the transport for every script (`netlib.conn_params`): `23` uses Netmiko's telnet driver
+for the device's `os_type`, anything else uses SSH. `os_type` stays the platform (`cisco_ios`, `cisco_xe`).
+Telnet is cleartext; treat telnet-managed devices as a finding (switch checklist SW18) and move them to SSH.
 
 ### `show.py` — run read-only commands in parallel
 
