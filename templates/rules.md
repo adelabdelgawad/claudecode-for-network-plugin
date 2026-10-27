@@ -73,7 +73,7 @@ All scripts share the target selectors: hostnames/IPs, `--match GLOB`, `--role`,
 
 ## Credentials
 
-A device's `credential_ref` (default `DEFAULT`) maps to `NET_<REF>_USERNAME`, `NET_<REF>_PASSWORD`, `NET_<REF>_ENABLE` in `.env`. Sophos uses `SOPHOS` (SSH) and `SOPHOSAPI` (XML API). vSphere/guest sets: `VCENTER`, `ESXI`, `WINDOWS` (+ `WINRM_TRANSPORT`), `LINUX` (+ `NET_LINUX_SSH_KEY`). Hosts and IPs go in the inventory, not in `.env`. Never hardcode or echo credentials.
+A device's `credential_ref` (default `DEFAULT`) maps to `NET_<REF>_USERNAME`, `NET_<REF>_PASSWORD`, `NET_<REF>_ENABLE` in `.env`. Sophos uses `SOPHOS` (SSH) and `SOPHOSAPI` (XML API). vSphere/guest sets: `VCENTER`, `ESXI`, `WINDOWS` (+ `WINRM_TRANSPORT`), `LINUX` (+ `NET_LINUX_SSH_KEY`), `VEEAM` (Veeam REST API). One credential set per inventory type (`DEFAULT` switches, `SOPHOS`/`SOPHOSAPI`, `VCENTER`, `ESXI`, `WINDOWS`, `LINUX`, `VEEAM`), never per site or per device: use a service account that is valid on every device of that type (e.g. an AD domain account added to each vCenter's SSO identity sources). Hosts and IPs go in the inventory, not in `.env`. Never hardcode or echo credentials.
 
 ## Rules for network work
 

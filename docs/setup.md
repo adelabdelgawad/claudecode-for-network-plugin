@@ -80,8 +80,9 @@ cfn discover 192.0.2.0/24 --cred DEFAULT
 cfn inventory counts
 ```
 
-Or just ask Claude to do it. Devices that answer SSH but reject the credentials are stored as `auth_failed`; give
-them a different `credential_ref` and rerun discovery for their IPs.
+Or just ask Claude to do it. Devices that answer SSH but reject the credentials are stored as `auth_failed`; don't add a new `credential_ref` for them — make the type's shared account valid on those devices (or fix it in `.env`) and rerun discovery for their IPs.
+
+One credential set per inventory type (`DEFAULT` switches, `SOPHOS`/`SOPHOSAPI`, `VCENTER`, `ESXI`, `WINDOWS`, `LINUX`, `VEEAM`), never per site or per device: use a service account that is valid on every device of that type (e.g. an AD domain account added to each vCenter's SSO identity sources).
 
 ## 5. Site context
 
