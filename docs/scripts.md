@@ -233,6 +233,19 @@ an update merged onto the live record (password masked). The writes run only fro
 `submit()`, which requires the consumed approval for the unchanged plan file and a request the plan lists. Plans:
 `change.py plan --title T --sophos-steps FILE.json FIREWALL` (FILE: `[{"resource": ..., "vars": {...}}, ...]`).
 
+### `results.py` — analyse a finished run (read-only)
+
+```bash
+results.py [RUN_DIR] summary                      # counts, ok/failed, top errors, slowest hosts
+results.py [RUN_DIR] failed                       # host<TAB>error
+results.py [RUN_DIR] field os_version [--top N]   # value counts of a dotted key in summary.json
+results.py [RUN_DIR] grep REGEX [--host GLOB] [-i] [--count]
+```
+
+`RUN_DIR` defaults to the newest run under `outputs/` or `reports/`. Reads `summary.json` + `raw/<host>.txt`
+(audits), `outputs/<ts>/<host>.txt` (`show --out`) and `outputs/<ts>/<host>/<Entity>.xml` (`sophos_api get --out`).
+Never writes. Use it instead of ad-hoc `python3 -c` over run files.
+
 ### `inventory_edit.py` — record user-supplied device facts
 
 ```bash

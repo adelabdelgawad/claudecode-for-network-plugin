@@ -48,6 +48,9 @@ BACKUP_ENTITIES = [
     "VPNIPSecConnection", "SSLVPNPolicy", "WebFilterPolicy", "IPSPolicy",
     "ApplicationFilterPolicy", "Notification", "SNMPCommunity", "SyslogServers", "Time",
 ]
+ENTITIES_PER_REQUEST = 4   # SFOS pays ~3-5 s of login per request, so batch; 28 in one request times out
+BACKUP_PARALLEL = 4        # chunks in flight at once per firewall
+BACKUP_MIN_TIMEOUT = 120   # a 4-entity request can take far longer than a one-entity one
 FACTS_PROBE_ENTITY = "DNS"  # any entity works: Response root attributes come back regardless
 
 ENTITY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
@@ -276,9 +279,8 @@ def entity_records(parent, entity):
     return recs, status
 
 
-def fetch_entity(dev, entity, timeout=30):
-    """Fetch one entity. Returns dict(state, records, status, root). state: ok|empty|skipped. Fatal -> ApiError."""
-    root = api_call(dev, [entity], timeout)
+def _entity_result(root, entity, scoped):
+    """dict(state, records, status, root) for one entity of a response (`scoped` = the root kept in the result)."""
     recs, status = entity_records(root, entity)
     if recs:
         state = "ok"
@@ -288,15 +290,42 @@ def fetch_entity(dev, entity, timeout=30):
     else:
         state = "skipped"
         status = status or f"no <{entity}> element in response (entity unsupported on this firmware?)"
-    return {"state": state, "records": recs, "status": status, "root": root}
+    return {"state": state, "records": recs, "status": status, "root": scoped}
+
+
+def _scoped_root(root, entity, entities):
+    """The response reduced to one entity's elements (what a single-entity request would have returned)."""
+    if len(entities) == 1:
+        return root
+    mine = ET.Element(root.tag, root.attrib)
+    mine.extend(c for c in root if c.tag == entity or c.tag not in entities)
+    return mine
+
+
+def fetch_entities(dev, entities, timeout=30):
+    """Fetch several entities with ONE <Get> request. Returns {entity: dict(state, records, status, root)}
+    in the order given, each shaped like fetch_entity()'s result. Fatal -> ApiError."""
+    entities = list(entities)
+    root = api_call(dev, entities, timeout)
+    return {e: _entity_result(root, e, _scoped_root(root, e, entities)) for e in entities}
+
+
+def fetch_entity(dev, entity, timeout=30):
+    """Fetch one entity. Returns dict(state, records, status, root). state: ok|empty|skipped. Fatal -> ApiError."""
+    return fetch_entities(dev, [entity], timeout)[entity]
+
+
+def chunks(items, size=ENTITIES_PER_REQUEST):
+    items = list(items)
+    return [items[i:i + size] for i in range(0, len(items), size)]
 
 
 # --------------------------------------------------------------------------- get
 def run_get(dev, entities, timeout):
     out = {}
     try:
-        for e in entities:
-            out[e] = fetch_entity(dev, e, timeout)
+        for chunk in chunks(entities):
+            out.update(fetch_entities(dev, chunk, timeout))
     except ApiError as e:
         return dev, None, f"{e.kind}: {e}"
     except Exception as e:  # noqa: BLE001 - report any failure per host
@@ -340,19 +369,49 @@ def cmd_get(args):
 
 
 # --------------------------------------------------------------------------- backup
+def _timed_out(err):
+    return err.kind == "conn" and "timed out" in str(err).lower()
+
+
+def _fetch_chunk(dev, names, timeout):
+    """{entity: result dict | ApiError} for one chunk; a timed-out chunk is retried one entity per request."""
+    try:
+        return fetch_entities(dev, names, timeout)
+    except ApiError as e:
+        if len(names) == 1 or not _timed_out(e):
+            return {n: e for n in names}
+    out = {}
+    for n in names:
+        try:
+            out[n] = fetch_entity(dev, n, timeout)
+        except ApiError as e:
+            out[n] = e
+    return out
+
+
+def _fetch_backup_set(dev, entities, timeout):
+    """{entity: result | ApiError}: chunks of ENTITIES_PER_REQUEST, BACKUP_PARALLEL requests at a time.
+    Raises the first error when no entity could be read at all (the device is unusable)."""
+    parts = chunks(entities)
+    with ThreadPoolExecutor(min(BACKUP_PARALLEL, len(parts))) as ex:
+        got = list(ex.map(lambda c: _fetch_chunk(dev, c, max(timeout, BACKUP_MIN_TIMEOUT)), parts))
+    merged = {n: r for part in got for n, r in part.items()}
+    if all(isinstance(r, ApiError) and r.kind in ("conn", "auth", "api", "proto") for r in merged.values()):
+        raise next(iter(merged.values()))
+    return merged
+
+
 def backup_xml(dev, timeout=30, entities=None):
     """Fetch the entity set and return (xml_text, per-entity summary dict). Raises ApiError if fatal."""
     entities = entities or BACKUP_ENTITIES
     stamp = datetime.now().isoformat(timespec="seconds")
     root = ET.Element("SophosBackup", host=dev["hostname"], ip=dev["mgmt_ip"], timestamp=stamp)
     summary, api_version = {}, None
+    fetched = _fetch_backup_set(dev, entities, timeout)
     for name in entities:
-        try:
-            r = fetch_entity(dev, name, timeout)
-        except ApiError as e:
-            if e.kind in ("conn", "auth", "api", "proto") and not summary:
-                raise  # first request failed: the device is unusable, not just this entity
-            ET.SubElement(root, "Entity", name=name, status="skipped", records="0", reason=str(e)[:200])
+        r = fetched[name]
+        if isinstance(r, ApiError):
+            ET.SubElement(root, "Entity", name=name, status="skipped", records="0", reason=str(r)[:200])
             summary[name] = "skipped"
             continue
         api_version = api_version or r["root"].get("APIVersion")

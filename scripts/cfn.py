@@ -29,6 +29,7 @@ RUNNABLE = {
     "vsphere_storage": "vSphere storage risk report",
     "guest_show": "allowlisted read-only commands inside guest OSes",
     "tasks": "the task list",
+    "results": "read-only analysis of a run dir: summary / grep / field / failed (no ad-hoc python)",
     "guest_security": "in-guest OS security audit (security preset, read-only)",
     "vsphere_checklist": "vSphere health/security checklist (approved items A01-H52)",
     "switch_checklist": "switch/router checklist SW01-SW34 (show-only)",

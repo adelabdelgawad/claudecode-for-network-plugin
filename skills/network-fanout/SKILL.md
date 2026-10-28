@@ -37,6 +37,7 @@ Concurrency changes *how fast* approved or read-only work runs. It never changes
 | `cfn backup` | `--workers 8` | Running configs go to `backups/<host>/<ts>.cfg` |
 | `cfn discover` | `--workers 32` | Only when asked or when a device is missing (see the site rules) |
 | `cfn log-audit` | `--workers 10` | Logging coverage and abnormal-log audit. Writes `summary.json` and `report.md` under `reports/log_audit/` |
+| `cfn results` | read-only | Analyse a finished run: `summary`, `failed`, `field PATH`, `grep REGEX`. Never writes |
 | `cfn change apply` | sequential | Approval-gated (`network-change` skill). Put every target that gets the same commands in **one** plan. |
 
 Keep workers at 32 or fewer for SSH. Old 2960s are slow to log in, so raise the timeouts, not the worker count.
@@ -51,7 +52,7 @@ Keep workers at 32 or fewer for SSH. Old 2960s are slow to log in, so raise the 
    - The console output is a compact summary only.
 
    It must send only allowlisted read-only commands (`netlib.require_readonly`). **A script never pushes config.** Changes only go through `change.py` (site rules, CRITICAL section).
-3. **Analyse the files, not the conversation.** Query `summary.json` and `raw/` with a short `python3 -c` or script that prints aggregates: counts by status, top-N, exceptions. Read a single raw file only when you need to check a specific finding.
+3. **Analyse the files, not the conversation.** Use `cfn results [RUN_DIR]` (read-only, defaults to the newest run): `summary` (counts, top errors, slowest), `failed`, `field os_version` (value counts from `summary.json`), `grep REGEX [--host GLOB] [-i] [--count]` (host: line matches across `raw/`, `outputs/<ts>/<host>.txt` and `<host>/<Entity>.xml`). Read a single raw file only when you need to check a specific finding.
 4. **Delegate the batch, not the device.** A Haiku subagent gets *one* instruction covering the whole target set ("run X with `--all --out`, return the summary"), and a Sonnet subagent gets the whole list of approved IDs.
 
 ## Changes

@@ -86,13 +86,18 @@ class FakeFirewall:
         self.names, self.action = list(names), {n: "Accept" for n in names}
         self.groups = {g: list(m) for g, m in (groups or {}).items()}
         self.nat, self.modes, self.calls, self.sent, self.reordered = list(nat_links), modes, [], [], set()
-        self.saved = {}
+        self.saved, self.reads = {}, 0  # reads = Get requests answered (one per fetch call, however many entities)
+
+    def read(self, entities):
+        self.reads += 1
+        return {e: self.fetch_entity(e) for e in entities}
 
     # -- install: route the module-level seams of sophos_api / sophos_xml / netlib to this fake
     def install(self):
         for mod, attr, fn in ((sophos_api, "attach_details", lambda devs: devs),
                               (sophos_api, "backup_device", lambda dev: Path("/tmp/fake-backup.xml")),
-                              (sophos_api, "fetch_entity", lambda dev, e: self.fetch_entity(e)),
+                              (sophos_api, "fetch_entity", lambda dev, e, timeout=30: self.read([e])[e]),
+                              (sophos_api, "fetch_entities", lambda dev, es, timeout=30: self.read(es)),
                               (sophos_api, "api_credentials", lambda dev: ("u", "p")),
                               (sophos_xml, "post", lambda dev, xml, timeout=30: self.post(xml)),
                               (netlib, "resolve_targets", lambda args: [dict(DEV)])):

@@ -22,6 +22,7 @@ import hashlib
 import json
 import secrets
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -356,14 +357,23 @@ def log_change(db, dev_id, action, details, cid):
     db.commit()
 
 
-def read_entity(dev, entity):
-    """Records of one Sophos entity ([] when there are none); raises RuntimeError if it cannot be read."""
-    r = sophos_api.fetch_entity(dev, entity)
+def _records(entity, r):
     if r["state"] == "empty":
         return []
     if r["state"] != "ok":
         raise RuntimeError(f"could not read {entity} ({r['state']}: {r['status']})")
     return r["records"]
+
+
+def read_entity(dev, entity):
+    """Records of one Sophos entity ([] when there are none); raises RuntimeError if it cannot be read."""
+    return _records(entity, sophos_api.fetch_entity(dev, entity))
+
+
+def read_entities(dev, entities):
+    """{entity: records} read with ONE request (each login costs seconds); RuntimeError if any cannot be read."""
+    got = sophos_api.fetch_entities(dev, list(entities))
+    return {e: _records(e, got[e]) for e in entities}
 
 
 def rule_name(rec):
@@ -387,11 +397,16 @@ def copy_follows(rules, old, new):
 
 
 def sophos_preflight(d, steps):
-    """Check every step that can be checked up front; RuntimeError before anything is sent."""
-    rules = read_entity(d, "FirewallRule")
-    names = [rule_name(r) for r in rules]
+    """Check every step that can be checked up front; RuntimeError before anything is sent.
+    One request reads FirewallRule, NATRule (when a rule is deleted) and what the first step watches; returns
+    the first step's watched entities from that read, which the first step uses as its "before"."""
     deleted = {s["vars"]["name"] for s in steps if s["resource"] == "firewall_rule.delete"}
-    linked = {(n.findtext("LinkedFirewallrule") or "").strip() for n in read_entity(d, "NATRule")} if deleted else set()
+    first = sophos_xml.watched(sophos_xml.load_resource(steps[0]["resource"])) if steps else ()
+    wanted = ["FirewallRule"] + (["NATRule"] if deleted else [])
+    read = read_entities(d, wanted + [e for e in first if e not in wanted])
+    rules = read["FirewallRule"]
+    names = [rule_name(r) for r in rules]
+    linked = {(n.findtext("LinkedFirewallrule") or "").strip() for n in read.get("NATRule", [])}
     for old in sorted(deleted & linked):
         raise RuntimeError(f"pre-check: a NAT rule is linked to {old!r}; deleting it would break that NAT rule")
     for s in steps:
@@ -403,10 +418,11 @@ def sophos_preflight(d, steps):
         if new in names and not copy_follows(rules, old, new):
             raise RuntimeError(f"pre-check: a rule named {new!r} already exists and is not an identical copy of "
                                f"{old!r} right after it; nothing changed")
+    return {e: read[e] for e in first}
 
 
 def snapshot(d, res):
-    return {e: read_entity(d, e) for e in sophos_xml.watched(res)}
+    return read_entities(d, sophos_xml.watched(res))
 
 
 def step_noop(res, v, before, record):
@@ -422,23 +438,27 @@ def step_noop(res, v, before, record):
     return None
 
 
-def run_step(d, plan, step):
-    """One step: read, skip if already done, send via sophos_xml.submit, re-read and verify. Returns the log text."""
+def run_step(d, plan, step, before=None):
+    """One step: read, skip if already done, send via sophos_xml.submit, re-read and verify.
+    `before` = the previous step's verified snapshot, reused when it covers the watched entities (else read fresh).
+    Returns (log text, snapshot that is current after this step)."""
     res = sophos_xml.load_resource(step["resource"])
     v = step["vars"]
-    before = snapshot(d, res)
+    if before is None or not set(sophos_xml.watched(res)) <= set(before):
+        before = snapshot(d, res)
     record = sophos_xml.pick_record(res, v, before[res.entity])
     why = step_noop(res, v, before, record)
     if why:
-        return f"{res.name}: {why}\n"
+        return f"{res.name}: {why}\n", before
     if step.get("expect_current"):
         sophos_xml.check_expect(record, step["expect_current"])
     user, pw = sophos_api.api_credentials(d)
     text = sophos_xml.submit(d, sophos_xml.build(res, v, user, pw, record), plan)
-    problems = sophos_xml.verify_step(res, v, before, snapshot(d, res))
+    after = snapshot(d, res)
+    problems = sophos_xml.verify_step(res, v, before, after)
     if problems:
         raise RuntimeError(f"{res.name} was sent ({text}) but verification failed: " + "; ".join(problems))
-    return f"{res.name}: {text}\n"
+    return f"{res.name}: {text}\n", after
 
 
 def sophos_steps_run(dev, plan, entry):
@@ -446,15 +466,19 @@ def sophos_steps_run(dev, plan, entry):
     d = sophos_api.attach_details([dev])[0]
     entry["backup"] = str(sophos_api.backup_device(d))
     steps = plan["steps"]
-    sophos_preflight(d, steps)
+    # `last`: the newest snapshot (preflight read, then each step's verified after): next "before", final listing
+    last = sophos_preflight(d, steps) or None
     for n, step in enumerate(steps, 1):
         entry["stage"] = f"step {n}/{len(steps)}: {describe_step(step)}"
-        entry["output"] += run_step(d, plan, step)
+        t0 = time.monotonic()
+        text, last = run_step(d, plan, step, last)
+        entry["output"] += f"{text.rstrip()} ({time.monotonic() - t0:.1f}s)\n"
         if step.get("renamed"):
             entry.setdefault("renamed", []).append(step["renamed"])
     entry["stage"] = None
     if any(s["resource"].startswith("firewall_rule.") for s in steps):
-        final = [rule_name(r) for r in read_entity(d, "FirewallRule")]
+        rules = last["FirewallRule"] if last and "FirewallRule" in last else read_entity(d, "FirewallRule")
+        final = [rule_name(r) for r in rules]
         entry["verify_output"]["FirewallRule names, in order"] = "\n".join(f"{i}. {n}" for i, n in enumerate(final, 1))
 
 
@@ -493,7 +517,7 @@ def cmd_apply(args):
     check_approval(args.id, digest)
     plan = dict(plan, digest=digest)  # sophos_xml.submit re-checks the consumed approval against this digest
     db = netlib.open_db(readonly=False)
-    results = []
+    results, started = [], time.monotonic()
     for dev in plan["targets"]:
         entry = apply_one(dev, plan, db)
         results.append(entry)
@@ -507,7 +531,8 @@ def cmd_apply(args):
     status = "applied" if len(results) == len(plan["targets"]) and all(r["status"] == "ok" for r in results) else "failed"
     (CHANGES / args.id / "result.json").write_text(json.dumps({
         "id": args.id, "status": status, "finished_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "results": results, "not_attempted": skipped}, indent=2, sort_keys=True))
+        "results": results, "not_attempted": skipped,
+        "apply_seconds": round(time.monotonic() - started, 1)}, indent=2, sort_keys=True))
     print(f"{args.id}: {status} ({sum(r['status'] == 'ok' for r in results)}/{len(plan['targets'])} ok)")
     for v in results:
         for cmd, out in v["verify_output"].items():
