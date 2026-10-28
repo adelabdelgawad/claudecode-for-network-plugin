@@ -96,6 +96,13 @@ def main():
             ("write hooks.json (absolute plugin path)",
              run(root, "Write", {"file_path": str(PLUGIN / "hooks/hooks.json"), "content": "{}"}), "BLOCK"),
             ("edit bin/cfn", run(root, "Edit", {"file_path": str(PLUGIN / "bin/cfn"), "new_string": "x"}), "BLOCK"),
+            ("edit the Sophos XML executor",
+             run(root, "Edit", {"file_path": str(PLUGIN / "scripts/sophos_xml.py"), "new_string": "x"}), "BLOCK"),
+            ("write a Sophos XML resource",
+             run(root, "Write", {"file_path": str(PLUGIN / "resources/sophos/x.add.xml"), "content": "<Set/>"}),
+             "BLOCK"),
+            ("shell write to a Sophos XML resource",
+             run(root, "Bash", {"command": f"echo x > {PLUGIN}/resources/sophos/x.add.xml"}), "BLOCK"),
             ("write the site marker", run(root, "Write", {"file_path": str(root / MARKER), "content": "{}"}), "BLOCK"),
             ("write site .claude/settings.json",
              run(root, "Write", {"file_path": str(root / ".claude/settings.json"), "content": "{}"}), "BLOCK"),
@@ -198,10 +205,18 @@ def main():
         cases.append(("I3: capture records in the cwd site when the project dir is not a site",
                       (site / ".claude" / "approvals" / "INV-EDIT.json").is_file(), True))
     runpy = str(Path(__file__).with_name("run-python"))
-    for flag, want in [(["--fail-closed"], 2), ([], 1)]:
-        p = subprocess.run(["/bin/bash", runpy, *flag, "x.py"], capture_output=True, text=True,
-                           env={"PATH": "/nonexistent"}, check=False)
-        cases.append((f"I4: run-python {' '.join(flag) or '(no flag)'} with no Python exits {want}", p.returncode, want))
+    with tempfile.TemporaryDirectory() as td:
+        site, other = Path(td) / "site", Path(td) / "other"
+        (site / "sub").mkdir(parents=True)
+        other.mkdir()
+        (site / MARKER).write_text("{}")
+        for label, flag, cwd, want in [("in a site", ["--fail-closed"], site, 2),
+                                       ("in a site subdir", ["--fail-closed"], site / "sub", 2),
+                                       ("outside a site", ["--fail-closed"], other, 0),
+                                       ("(no flag)", [], site, 1)]:
+            p = subprocess.run(["/bin/bash", runpy, *flag, "x.py"], capture_output=True, text=True, cwd=cwd,
+                               env={"PATH": "/nonexistent"}, check=False)
+            cases.append((f"I4: run-python {' '.join(flag)} {label} with no Python exits {want}", p.returncode, want))
     for prompt, want in [("APPROVE INV-EDIT", "approved"), ("REJECT INV-EDIT", "rejected"),
                          ("approve inv-edit please", "none")]:
         with tempfile.TemporaryDirectory() as td:

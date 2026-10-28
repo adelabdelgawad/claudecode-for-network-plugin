@@ -1,0 +1,16 @@
+<!-- cfn-resource
+verb: Set add
+entity: FirewallRule
+key: new
+vars: old new
+record_from: old
+drop: After Before
+rulenames: old new
+-->
+<Set operation="add">
+  <FirewallRule>
+    <Name>$new</Name>
+    <Position>After</Position>
+    <After><Name>$old</Name></After>
+  </FirewallRule>
+</Set>

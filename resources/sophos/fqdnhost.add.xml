@@ -1,0 +1,12 @@
+<!-- cfn-resource
+verb: Set add
+entity: FQDNHost
+key: name
+vars: name fqdn
+-->
+<Set operation="add">
+  <FQDNHost>
+    <Name>$name</Name>
+    <FQDN>$fqdn</FQDN>
+  </FQDNHost>
+</Set>

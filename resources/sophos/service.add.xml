@@ -1,0 +1,21 @@
+<!-- cfn-resource
+verb: Set add
+entity: Services
+key: name
+vars: name service_type protocol src_port dst_port
+defaults: service_type=TCPorUDP src_port=1:65535
+choices: service_type=TCPorUDP protocol=TCP|UDP
+-->
+<Set operation="add">
+  <Services>
+    <Name>$name</Name>
+    <Type>$service_type</Type>
+    <ServiceDetails>
+      <ServiceDetail>
+        <SourcePort>$src_port</SourcePort>
+        <DestinationPort>$dst_port</DestinationPort>
+        <Protocol>$protocol</Protocol>
+      </ServiceDetail>
+    </ServiceDetails>
+  </Services>
+</Set>

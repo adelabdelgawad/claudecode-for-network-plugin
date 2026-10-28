@@ -46,7 +46,7 @@ Pass `--cred` from the device's `credential_ref` so `discover.py` doesn't mark i
 
 ## Updating inventory facts
 
-Updating *inventory records* (OS version, serial, model, role, site, status, credential_ref) does **not** change a device, so it needs no `APPROVE <CHG-ID>`. The guard hook still blocks DB commits until the user types `APPROVE INV-EDIT` (valid 15 min); ask for it, don't work around the hook. Do it with a short `python3 -c "import sqlite3; ..."` UPDATE keyed by `hostname` or `mgmt_ip`, using parameterized queries, and tell the user what you changed.
+Updating *inventory records* (OS version, serial, model, role, site, status, credential_ref) does **not** change a device, so it needs no `APPROVE <CHG-ID>`. The guard hook still blocks DB commits until the user types `APPROVE INV-EDIT` (valid 15 min); ask for it, don't work around the hook. Use `cfn inventory-edit add HOST IP --type ... [--site --role --notes ...]` for a device the user supplies, and `cfn inventory-edit set HOST|IP --ip/--role/--site/--notes/--status/--cred ...` for corrections (`--dry-run` first; the script also refuses to write without the approval and refuses duplicate hostnames/IPs). Fall back to a short parameterized `python3 -c "import sqlite3; ..."` only for a field the script lacks, and tell the user what you changed.
 
 - New or missing devices: `cfn discover <ip|subnet> [--cred REF]`. Run it only when the user asks or when a device is missing; it upserts by `mgmt_ip`. It probes SSH, then telnet, and stores the answering port in `devices.port` (`23` = managed over telnet).
 - `change_log` is written by `cfn change apply`. Don't insert fake entries by hand.

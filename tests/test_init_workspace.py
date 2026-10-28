@@ -44,8 +44,9 @@ def main():
         cases.append(("settings.json enables the plugin", json.loads((site / ".claude/settings.json").read_text()),
                       SETTINGS))
         marker = json.loads((site / ".claude-for-network").read_text())
+        version = json.loads((REPO / ".claude-plugin" / "plugin.json").read_text())["version"]
         cases.append(("marker names the plugin and version", (marker["plugin"], marker["version"]),
-                      ("network-ops", "0.2.1")))
+                      ("network-ops", version)))
         cases.append(("CLAUDE.local.md holds no data rows", "10." in (site / "CLAUDE.local.md").read_text(), False))
 
         before = snapshot(site)

@@ -1,0 +1,13 @@
+<!-- cfn-resource
+verb: Set update
+entity: FQDNHost
+key: name
+vars: name fqdn
+record_from: name
+-->
+<Set operation="update">
+  <FQDNHost>
+    <Name>$name</Name>
+    <FQDN>$fqdn</FQDN>
+  </FQDNHost>
+</Set>

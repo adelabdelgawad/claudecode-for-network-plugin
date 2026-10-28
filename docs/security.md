@@ -20,6 +20,12 @@ The guard is pattern-based and is **not a sandbox**. Treat it as a seatbelt: als
 automation account the least privilege that works (e.g. a read-only vCenter role, a Get-only
 Sophos API profile) and keep `bypassPermissions` mode off on sessions that hold write credentials.
 
+The only Sophos write the plugin can send is the rule rename (`<Set operation="add">` of a copy,
+`<Set operation="update">` of its rule group, `<Remove>` of the original). Each request is built by a narrow
+builder in `sophos_api.py` that re-parses its XML and asserts that exact shape before sending, and it is only
+reachable from `cfn change apply` after `APPROVE <CHG-ID>`. Keep the routine API account Get-only; point
+`firewall_details.api_credential_ref` at a write-capable account only for the rename window.
+
 ## Keeping secrets and site data out of git
 
 | Never commit | Why |

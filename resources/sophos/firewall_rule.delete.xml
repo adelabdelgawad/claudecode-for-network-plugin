@@ -1,0 +1,10 @@
+<!-- cfn-resource
+verb: Remove
+entity: FirewallRule
+key: name
+vars: name
+rulenames: name
+-->
+<Remove>
+  <FirewallRule><Name>$name</Name></FirewallRule>
+</Remove>

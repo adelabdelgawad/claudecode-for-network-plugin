@@ -1,0 +1,9 @@
+<!-- cfn-resource
+verb: Remove
+entity: Services
+key: name
+vars: name
+-->
+<Remove>
+  <Services><Name>$name</Name></Services>
+</Remove>

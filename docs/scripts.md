@@ -190,6 +190,77 @@ Outputs under `reports/checklist/sophos/<ts>/`: `summary.json` (same item schema
 plus `_meta.json` (passwords, PSKs, SNMP communities and API tokens masked; dirs 700, files 600). `--from-raw DIR`
 (the run dir or its `raw/`) re-runs the checks offline with identical results.
 
+### `sophos_inspect.py` — read-only Sophos inspection
+
+```bash
+sophos_inspect.py rules SOURCE... [--name GLOB] [--group NAME] [--disabled]
+sophos_inspect.py find  SOURCE... --name TEXT [--name TEXT ...]
+sophos_inspect.py usage SOURCE... --object NAME
+sophos_inspect.py diff  BEFORE AFTER
+```
+
+`SOURCE` is a firewall hostname (read live with `<Get>` only), a `sophos_api.py backup` file, or an
+`outputs/<ts>/<host>/` directory from `sophos_api.py get ... --out`. `rules` prints one line per rule (position,
+status, name, rule group, action, zones, networks, services); `find` shows where a name exists (rules, NAT rules,
+hosts, FQDN hosts, groups, services, web filters, group members) or `NOT FOUND`; `usage` lists every rule, group
+and NAT rule that references an object; `diff` compares two snapshots and reports renamed (identical content under
+a new name), added, removed and changed rules (with the changed fields), rule order, rule-group membership and NAT
+rules. List members are compared as sets, so a different order is not a difference.
+
+### `sophos_compare.py` — rules across several firewalls (read-only)
+
+```bash
+sophos_compare.py SOURCE SOURCE [SOURCE...] [--min-score 0.6] [--groups pins.json]
+```
+
+Groups rules by purpose (action class, direction, sources, destinations, services, web filter) plus a typo-tolerant
+name match, at most one rule per firewall per group. Writes `reports/sophos_compare/<ts>/report.md` and
+`groups.json`: rules common to all, common to some (with `— missing`), site-specific, a recommended name per group
+(`Allow-`/`Block-`/`Publish-` + the majority spelling), and rule-order problems (rules shadowed by an earlier rule;
+rules blocked for an earlier deny rule's sources). `--groups` pins groups (JSON list of `{firewall: rule name}`)
+before automatic matching.
+
+### `sophos_xml.py` — Sophos write resources
+
+```bash
+sophos_xml.py list
+sophos_xml.py render RESOURCE [--var k=v ...] [--host FIREWALL]
+```
+
+Every Sophos write is a template in `resources/sophos/<entity>.<action>.xml` with a `cfn-resource` header (verb,
+entity, variables, merge rules). `list` and `render` never send: `render --host` does one read-only `<Get>` to show
+an update merged onto the live record (password masked). The writes run only from `change.py apply` through
+`submit()`, which requires the consumed approval for the unchanged plan file and a request the plan lists. Plans:
+`change.py plan --title T --sophos-steps FILE.json FIREWALL` (FILE: `[{"resource": ..., "vars": {...}}, ...]`).
+
+### `inventory_edit.py` — record user-supplied device facts
+
+```bash
+inventory_edit.py add HOSTNAME MGMT_IP --type TYPE [--vendor V] [--site S] [--role R] [--notes N] [--cred REF] [firewall options] [--dry-run]
+inventory_edit.py set HOST_OR_IP [--ip] [--hostname] [--role] [--site] [--notes] [--status] [--cred] [--port] [firewall options] [--dry-run]
+```
+
+Firewall options: `--ha-mode`, `--ha-role`, `--ha-peer`, `--api-port`, `--verify-ssl`, `--api-cred`. A Sophos
+firewall gets `os_type sophos_sfos`, `credential_ref SOPHOS` and a `firewall_details` row. Refuses duplicate
+hostnames/IPs; every real write needs the user's `APPROVE INV-EDIT` (exit 2 otherwise).
+
+### `sophos_rename.py` — Sophos rule renames: check, plan, verify
+
+```bash
+sophos_rename.py check  (--file FILE | --from-report REPORT.md) TARGETS...
+sophos_rename.py plan   --title TEXT (--file FILE | --from-report REPORT.md) [--canary] FIREWALL
+sophos_rename.py verify CHG-ID
+```
+
+SFOS cannot rename a rule in place, so a rename is a copy + verify + delete that `change.py apply` performs per
+rule. `FILE` holds `old name => new name` lines; `REPORT.md` is a markdown table with a `Recommended name` column
+and one column per firewall (named like a dash-separated part of its hostname). `check` is a live read-only
+pre-flight per rename (old rule present once, new name free or an identical copy already follows, rule group,
+status, NAT link; exit 1 when anything blocks). `plan` runs `check` and creates the change plan(s); `--canary`
+makes plan 1 one ungrouped plus one grouped rule and plan 2 the rest. `verify` runs after `change.py apply` and
+compares the live firewall with the backup `apply` took first (rule count, order, content, status, group
+membership, NAT rules): PASS/FAIL/WARN lines, exit 1 on FAIL. Nothing in this script writes to a firewall.
+
 ### `vsphere_checklist.py` — vSphere health and security checklist
 
 ```
@@ -279,12 +350,16 @@ Offline self-test with fake fixtures: `.venv/bin/python tests/test_guest_securit
 ```bash
 change.py plan --title TEXT (-c CMD ... | --commands-file FILE) [--verify "show ..."] \
     [--rollback-file FILE] [--save] [--continue-on-error] TARGETS
+change.py plan --title TEXT --rename-rules-file FILE FIREWALL     # Sophos rule renames (name only)
 change.py show ID
 change.py list
 change.py apply ID
 ```
 
-See [change-workflow.md](change-workflow.md).
+`--rename-rules-file` (lines `old name => new name`) creates a Sophos rename plan; `apply` then backs the firewall
+up (rule groups included) and renames each rule by copy + verify + delete, stopping at the first discrepancy. Use
+[`sophos_rename.py`](#sophos_renamepy--sophos-rule-renames-check-plan-verify) for the pre-flight, the staged plans
+and the verification. See [change-workflow.md](change-workflow.md).
 
 ## Libraries
 

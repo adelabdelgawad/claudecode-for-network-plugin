@@ -12,10 +12,15 @@ import paths
 
 RUNNABLE = {
     "inventory": "devices / VMs / ESXi from the inventory DB (read-only)",
+    "inventory_edit": "add / set device facts in the inventory DB (needs APPROVE INV-EDIT)",
     "discover": "SSH sweep + show version, upserts the inventory",
     "show": "allowlisted read-only commands on targets",
     "backup": "running-config / Sophos XML backups",
     "sophos_api": "Sophos XG XML API, Get-only",
+    "sophos_rename": "Sophos rule renames: check / plan (read-only), verify after apply",
+    "sophos_inspect": "Sophos read-only inspection: rules, find, usage, diff of two snapshots",
+    "sophos_compare": "Sophos rules across firewalls: common / specific, recommended names, order problems (read-only)",
+    "sophos_xml": "Sophos XML resource templates: list / render (read-only); writes run only via cfn change apply",
     "audit": "concurrent security audit",
     "log_audit": "logging-coverage and abnormal-log audit",
     "change": "plan / show / list / apply (apply only after the user types APPROVE <ID>)",

@@ -14,7 +14,8 @@ Claude cannot approve its own changes. The gate is enforced by two Claude Code h
 Config mode, interface/VLAN/port/ACL/routing edits, `shutdown` / `no shutdown`,
 `write memory` / `copy run start`, `reload`, `erase`, firmware or file copies, clearing state,
 and any API `POST` / `PUT` / `PATCH` / `DELETE`. For vSphere: power actions, snapshots, vMotion,
-reconfiguration, maintenance mode. For Sophos XG: XML API `<Set>` / `<Remove>`.
+reconfiguration, maintenance mode. For Sophos XG: XML API `<Set>` / `<Remove>`; the one supported Sophos change
+is renaming firewall rules (see [Sophos rule renames](#sophos-rule-renames)).
 
 ## Steps
 
@@ -50,6 +51,29 @@ reconfiguration, maintenance mode. For Sophos XG: XML API `<Set>` / `<Remove>`.
    pushes the commands, saves if `--save` was set, runs the verify commands, writes a
    `change_log` row, and stores the result in `changes/<CHG-ID>/result.json`.
 7. **Rollback** of a failed change is a **new plan** with its own approval.
+
+## Sophos rule renames
+
+SFOS cannot rename a firewall rule in place (the name is the key; an update with `<NewName>` is refused), so a
+rename is a copy + verify + delete performed per rule by `cfn change apply`. The scripts do the surrounding work so
+no one has to read raw XML:
+
+```bash
+cfn sophos-rename check  --file changes/names.txt FW-EDGE-01              # live pre-flight, read-only
+cfn sophos-rename plan   --title "..." --file changes/names.txt --canary FW-EDGE-01   # creates plan(s), sends nothing
+#   the user types  APPROVE <CHG-ID>  (one line per plan)
+cfn change apply <CHG-ID>                                                # one unchained command; takes minutes
+cfn sophos-rename verify <CHG-ID>                                        # live firewall vs the backup apply took
+```
+
+`names.txt` holds `old name => new name` lines (or use `--from-report REPORT.md`). `--canary` splits the work into a
+first plan with one ungrouped and one grouped rule and a second plan with the rest, so both code paths are proven
+before the bulk; approve and verify plan 1 before plan 2. Per rule, `apply` creates a copy right after the original,
+requires an identical copy in the expected place, makes sure the copy is in the original's rule group, deletes the
+original, then re-reads names, order, content and group membership. It stops at the first discrepancy and never
+deletes the original before the copy is verified; a rerun reuses a verified copy. Renamed rules are new rules: hit
+counters restart and old log entries keep the old name. A rule that a NAT rule links to is refused. Rollback is a new
+plan (`changes/<CHG-ID>/rollback-renames.txt` holds the reversed names).
 
 ## How the gate is enforced
 

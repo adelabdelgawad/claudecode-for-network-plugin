@@ -19,11 +19,12 @@ PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 # Relative to the plugin (code) root and to the site (data) root respectively.
 PLUGIN_PROTECTED = ["hooks/", "bin/", ".claude-plugin/", "scripts/change.py", "scripts/netlib.py", "scripts/paths.py",
                     "scripts/cfn.py", "scripts/vmlib.py", "scripts/show.py", "scripts/guest_show.py",
-                    "scripts/sophos_api.py", "templates/rules.md"]
+                    "scripts/sophos_api.py", "scripts/sophos_xml.py", "resources/", "templates/rules.md"]
 SITE_PROTECTED = [".claude/settings.json", ".claude/settings.local.json", ".claude/approvals/", MARKER]
 # Substrings that mark a Bash command as touching the gate (blocked when the command also looks like a write).
 BASH_PROTECTED = ["change_guard", "approval_capture", "site_rules", "setup_trigger", "run-python", "hooks.json",
                   "change.py", "netlib.py", "paths.py", "cfn.py", "vmlib.py", "guest_show.py", "sophos_api.py",
+                  "sophos_xml.py", "resources/sophos",
                   "scripts/show.py", "rules.md", "bin/cfn", ".claude-plugin", ".claude/settings", MARKER,
                   str(PLUGIN_ROOT)]
 WRITEISH = ["sed -i", "perl -i", "tee", "cp ", "mv ", "rm ", "truncate", "chmod", "chown", "ln ",

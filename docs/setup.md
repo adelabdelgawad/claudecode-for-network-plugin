@@ -64,7 +64,7 @@ Each device row has a `credential_ref`; the scripts read `NET_<REF>_USERNAME`, `
 | `credential_ref` | Used for |
 |---|---|
 | `DEFAULT` | Switches and routers (default for new devices) |
-| `SOPHOS` / `SOPHOSAPI` | Sophos XG SSH console / XML API (Get-only) |
+| `SOPHOS` / `SOPHOSAPI` | Sophos XG SSH console / XML API (Get-only; the gated rule rename needs a write-capable API account) |
 | `VCENTER` / `ESXI` | vSphere (use a read-only role) |
 | `WINDOWS` / `LINUX` | Guest operating systems (WinRM / SSH) |
 | `VEEAM` | Veeam Backup & Replication REST API (port 9419, read-only Backup Viewer role) |

@@ -1,0 +1,21 @@
+<!-- cfn-resource
+verb: Set update
+entity: Services
+key: name
+vars: name protocol src_port dst_port
+record_from: name
+record_must: Type=TCPorUDP
+choices: protocol=TCP|UDP
+-->
+<Set operation="update">
+  <Services>
+    <Name>$name</Name>
+    <ServiceDetails>
+      <ServiceDetail>
+        <SourcePort>$src_port</SourcePort>
+        <DestinationPort>$dst_port</DestinationPort>
+        <Protocol>$protocol</Protocol>
+      </ServiceDetail>
+    </ServiceDetails>
+  </Services>
+</Set>

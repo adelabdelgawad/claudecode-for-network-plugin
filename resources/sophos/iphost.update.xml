@@ -1,0 +1,21 @@
+<!-- cfn-resource
+verb: Set update
+entity: IPHost
+key: name
+vars: name
+optional: host_type ip_family ip_address subnet start_ip end_ip
+record_from: name
+prune: IPFamily HostType IPAddress Subnet StartIPAddress EndIPAddress
+choices: host_type=IP|Network|IPRange
+-->
+<Set operation="update">
+  <IPHost>
+    <Name>$name</Name>
+    <IPFamily>$ip_family</IPFamily>
+    <HostType>$host_type</HostType>
+    <IPAddress>$ip_address</IPAddress>
+    <Subnet>$subnet</Subnet>
+    <StartIPAddress>$start_ip</StartIPAddress>
+    <EndIPAddress>$end_ip</EndIPAddress>
+  </IPHost>
+</Set>

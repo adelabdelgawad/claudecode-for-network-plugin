@@ -8,10 +8,12 @@ Usage: cfn sophos-api get ENTITY [ENTITY ...] [--host H ...] [--match GLOB] [--r
 Transport: POST of form field `reqxml` to https://<mgmt_ip>:<api_port>/webconsole/APIController
 with <Request><Login>..</Login><Get>..</Get></Request>.
 
-READ-ONLY GUARANTEE: the only request builder in this module is build_get_request(); it can emit
-<Login> and <Get> and nothing else, and assert_get_only() re-parses the serialized XML and asserts
-that before every send. Writing to the firewall (the API's write and delete verbs) is a device
-change and belongs to the approval-gated scripts/change.py flow, never to this file.
+READ-ONLY GUARANTEE: every command-line verb here (get, backup, facts, audit) sends only
+build_get_request(); it can emit <Login> and <Get> and nothing else, and assert_get_only()
+re-parses the serialized XML and asserts that before every send.
+This module builds NO write request: Set add / Set update / Remove live only in scripts/sophos_xml.py
+(template-driven, sent only after the approval gate consumed the user's APPROVE). Kept here: the shared
+transport (_post_xml), credentials, entity reading and the record helpers (rule_content, group_members, ...).
 
 Targets: standard netlib selectors, restricted to vendor='sophos' AND device_type='firewall'.
 Per-firewall options come from the firewall_details table (missing row -> defaults; missing table
@@ -40,7 +42,7 @@ from netlib import ROOT
 # https://docs.sophos.com/nsg/sophos-firewall/latest/API/ (an entity the firmware does not
 # support is recorded as skipped, never fatal).
 BACKUP_ENTITIES = [
-    "FirewallRule", "NATRule", "IPHost", "IPHostGroup", "FQDNHost", "FQDNHostGroup",
+    "FirewallRule", "FirewallRuleGroup", "NATRule", "IPHost", "IPHostGroup", "FQDNHost", "FQDNHostGroup",
     "Services", "ServiceGroup", "Interface", "VLAN", "Alias", "Zone", "UnicastRoute",
     "DNS", "DHCPServer", "AdminSettings", "AdministrationProfile", "AuthenticationServer",
     "VPNIPSecConnection", "SSLVPNPolicy", "WebFilterPolicy", "IPSPolicy",
@@ -99,6 +101,43 @@ def assert_get_only(xml):
     low = xml.lower()
     for bad in ("<set", "<remove", "<add>", "<update", "<delete"):
         assert bad not in low, f"write verb {bad!r} in request"
+
+
+# --------------------------------------------------------------------------- record helpers (read side of rule renames)
+RULE_NAME_MAX = 60  # SFOS limit: 60 UTF-8 characters, no commas
+
+
+def check_rule_name(name):
+    """Raise ValueError unless `name` is a legal, untrimmed SFOS firewall rule name."""
+    if not isinstance(name, str) or not name or name != name.strip():
+        raise ValueError(f"invalid rule name {name!r}: empty or has leading/trailing spaces")
+    if len(name) > RULE_NAME_MAX or "," in name or any(ord(c) < 32 for c in name):
+        raise ValueError(f"invalid rule name {name!r}: max {RULE_NAME_MAX} chars, no commas or control characters")
+
+
+RULE_POSITION_TAGS = ("Name", "Position", "After", "Before")  # what differs between a rule and its renamed copy
+
+
+def canon(e):
+    """(tag, text, sorted children). Lists such as networks, zones or services are sets to SFOS, and a
+    rule created from a copy can list their members in another order, so order must not matter."""
+    return (e.tag, (e.text or "").strip(), tuple(sorted(canon(c) for c in e)))
+
+
+def rule_content(rec):
+    """Canonical content of a firewall rule record minus its name and position: what a rename must not change."""
+    return sorted(canon(c) for c in rec if c.tag not in RULE_POSITION_TAGS)
+
+
+def group_rest(grp):
+    """Everything in a rule-group record except its member list."""
+    return [(e.tag, (e.text or "").strip()) for child in grp if child.tag != "SecurityPolicyList"
+            for e in child.iter()]
+
+
+def group_members(grp):
+    lst = grp.find("SecurityPolicyList")
+    return [(e.text or "").strip() for e in lst] if lst is not None else []
 
 
 # --------------------------------------------------------------------------- inventory helpers
@@ -163,7 +202,11 @@ def _ssl_context(dev):
 def api_call(dev, entities, timeout=30):
     """Send one read-only <Get> and return the parsed <Response> root. Raises ApiError."""
     user, pw = api_credentials(dev)
-    xml = build_get_request(user, pw, entities)
+    return _post_xml(dev, build_get_request(user, pw, entities), timeout)
+
+
+def _post_xml(dev, xml, timeout=30):
+    """POST one request body that build_get_request() or sophos_xml.build() already asserted; return the parsed <Response> root."""
     url = f"https://{dev['mgmt_ip']}:{int(dev['api_port'])}/webconsole/APIController"
     body = urllib.parse.urlencode({"reqxml": xml}).encode()
     req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"})

@@ -1,0 +1,21 @@
+<!-- cfn-resource
+verb: Set update
+entity: FirewallRule
+key: name
+vars: name position
+optional: after before
+record_from: name
+drop: After Before
+prune: After Before
+choices: position=After|Before|Top|Bottom
+requires: position After:after Before:before Top: Bottom:
+rulenames: name after before
+-->
+<Set operation="update">
+  <FirewallRule>
+    <Name>$name</Name>
+    <Position>$position</Position>
+    <After><Name>$after</Name></After>
+    <Before><Name>$before</Name></Before>
+  </FirewallRule>
+</Set>

@@ -1,0 +1,15 @@
+<!-- cfn-resource
+verb: Set update
+entity: FirewallRuleGroup
+key: name
+vars: name members
+lists: members=SecurityPolicy
+record_from: name
+rulenames: name members
+-->
+<Set operation="update">
+  <FirewallRuleGroup>
+    <Name>$name</Name>
+    <SecurityPolicyList>$members</SecurityPolicyList>
+  </FirewallRuleGroup>
+</Set>

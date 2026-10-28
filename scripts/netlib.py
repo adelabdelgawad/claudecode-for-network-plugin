@@ -1,9 +1,10 @@
 """Shared helpers for the network scripts (inventory targeting, Netmiko params, backups)."""
 import fnmatch
+import json
 import os
 import re
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 
 import paths
 from dotenv import load_dotenv
@@ -54,6 +55,16 @@ def open_db(readonly=True):
     if readonly:
         return sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     return sqlite3.connect(DB)
+
+
+def inv_edit_approved():
+    """True if the user typed `APPROVE INV-EDIT` in the last 15 minutes (same rule as hooks/change_guard.py)."""
+    try:
+        d = json.loads((ROOT / ".claude" / "approvals" / "INV-EDIT.json").read_text())
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(d["approved_at"])  # noqa: UP017 (py<3.11)
+        return d.get("status") == "approved" and age.total_seconds() < 15 * 60
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _query(where, params):

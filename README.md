@@ -115,7 +115,7 @@ The guard and approval hooks act only inside a site, so the plugin never gets in
 | Area | Technologies |
 |------|-------------|
 | Switches | Cisco IOS / IOS-XE (Netmiko; old 2960s with `diffie-hellman-group1-sha1` via `paramiko<4`) |
-| Firewalls | Sophos XG / SFOS (XML API, Get-only; SSH console) |
+| Firewalls | Sophos XG / SFOS (XML API: read-only, plus the approval-gated rule rename; SSH console) |
 | Virtualisation | VMware vCenter / ESXi (pyVmomi, read-only), Windows (WinRM) and Linux (SSH) guests |
 
 ## Updating

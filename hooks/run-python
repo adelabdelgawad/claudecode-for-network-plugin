@@ -1,9 +1,25 @@
 #!/usr/bin/env bash
 # Run a Python 3 file with whatever interpreter this machine has (Linux: python3; Windows Git Bash: python / py -3).
 # `run-python --fail-closed FILE ...` exits 2 when no Python is found, so a PreToolUse guard blocks instead of
-# silently letting the tool call through (Claude Code only blocks on exit 2).
+# silently letting the tool call through (Claude Code only blocks on exit 2). That applies only inside a
+# claude-for-network site: the plugin may be installed at user scope, and a machine without Python must not have
+# every tool call in every unrelated project blocked.
 missing=1
 if [ "$1" = "--fail-closed" ]; then missing=2; shift; fi
+
+# True when the project dir or the current dir is, or is below, a site (marker file or inventory DB).
+# Pure bash parameter expansion: this must work when PATH holds nothing, not even `dirname`.
+in_site() {
+  local d
+  for d in "${CLAUDE_PROJECT_DIR:-}" "$PWD"; do
+    while [ -n "$d" ]; do
+      [ -f "$d/.claude-for-network" ] || [ -f "$d/inventory/inventory.db" ] && return 0
+      [ "$d" = "${d%/*}" ] && break
+      d=${d%/*}
+    done
+  done
+  return 1
+}
 for c in python3 python; do
   if command -v "$c" >/dev/null 2>&1 && "$c" -c "import sys; sys.exit(sys.version_info < (3, 8))" 2>/dev/null; then
     exec "$c" "$@"
@@ -11,4 +27,5 @@ for c in python3 python; do
 done
 if command -v py >/dev/null 2>&1; then exec py -3 "$@"; fi
 echo "claude-for-network: Python 3 not found on PATH" >&2
+if [ "$missing" = 2 ] && ! in_site; then exit 0; fi
 exit "$missing"

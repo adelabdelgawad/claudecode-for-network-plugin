@@ -27,7 +27,7 @@ The gate is enforced by the plugin's hooks, but the rule applies even where a ho
 | `network-fanout` | **Any** task covering more than one device: one concurrent script call, output kept in files, summaries only |
 | `vsphere` | vCenter / ESXi / VMs / guest OS: inventory, discovery, read-only views, audits, guest commands; vSphere changes are gated |
 | `tasks` | The task list: open tasks/findings as a checklist, import findings from reports, track status |
-| `sophos-xg` | Sophos XG / SFOS firewalls: XML API (Get-only) facts, rules/NAT/objects, XML backups, rule audits |
+| `sophos-xg` | Sophos XG / SFOS firewalls: XML API (Get-only) facts, rules/NAT/objects, XML backups, rule audits, inspection, and the gated rule rename flow |
 | `checklist` | Per-device-type checklists (every item pass/warn/crit/skip): vSphere, switches, Sophos, Veeam approved; new items or types need the user's approval first |
 | `network-workspace-init` | `setup claude for network here`: create or complete a site workspace |
 
@@ -45,7 +45,9 @@ The gate is enforced by the plugin's hooks, but the rule applies even where a ho
 | `cfn discover` | SSH sweep + `show version`, upserts the inventory | Read-only |
 | `cfn show` | Allowlisted read-only commands on targets (`--out` saves to `outputs/<ts>/`) | Read-only |
 | `cfn backup` | Running-config → `backups/<hostname>/<ts>.cfg` (Sophos → `.xml`) | Read-only |
-| `cfn sophos-api` | Sophos XG XML API, Get-only: `get` / `backup` / `facts [--update-inventory]` / `audit` | Read-only |
+| `cfn sophos-api` | Sophos XG XML API, Get-only: `get` / `backup` (rule groups included) / `facts [--update-inventory]` / `audit` | Read-only |
+| `cfn sophos-inspect` | Sophos read-only inspection of a firewall, backup or export: `rules` / `find` / `usage` / `diff` (renames, groups, NAT) | Read-only |
+| `cfn sophos-rename` | Sophos rule renames: `check` (live pre-flight) / `plan [--canary]` (creates change plans, sends nothing) / `verify <ID>` (after `apply`) | Read-only |
 | `cfn veeam-api` | Veeam B&R v12+ REST API, GET-only (`--host` required, not in the inventory): `facts` / `get` / `jobs` / `sessions` / `repos` / `report` → `reports/veeam/<ts>/`; creds `NET_VEEAM_*` | Read-only |
 | `cfn audit` | Concurrent security audit → `audits/<date>/` | Read-only |
 | `cfn log-audit` | Logging-coverage and abnormal-log audit → `reports/log_audit/<ts>/` | Read-only |
@@ -73,7 +75,7 @@ All scripts share the target selectors: hostnames/IPs, `--match GLOB`, `--role`,
 ## Inventory
 
 - `devices(hostname, mgmt_ip, site_id, device_type, role, vendor, model, os_type, os_version, serial, port, credential_ref, status, notes, ...)`. `os_type` uses Netmiko device_type names (`cisco_ios`, `cisco_xe`, ...). `status`: `active` | `spare` | `decommissioned` | `auth_failed`. Only target `active` devices unless told otherwise.
-- `change_log` records every device change; `tasks` is the task list; `firewall_details` holds Sophos facts (XML API `<Get>` is read-only, `<Set>`/`<Remove>` are **changes**).
+- `change_log` records every device change; `tasks` is the task list; `firewall_details` holds Sophos facts (XML API `<Get>` is read-only, `<Set>`/`<Remove>` are **changes**; the only supported one is the rule rename in `cfn change`, see the `sophos-xg` skill).
 - vSphere tables (`vcenters`, `esxi_hosts`, `machines`, `machine_nics`, `port_groups`) are separate from `devices` on purpose, so network scripts can never target a VM or ESXi host. Any vCenter/ESXi/guest action that modifies state is a **change**.
 - **Inventory first, do NOT rescan** known networks. Rescan only when asked or a device is missing: `cfn discover <subnet|ip> [--cred REF]`.
 - **Ask before answering from stored data.** When the user asks about inventory devices, ask (with `AskUserQuestion`) whether to refresh those devices first, naming them and their `updated_at`. Refresh with `cfn discover <ip>...`, `cfn sophos-api facts <fw> --update-inventory`, or `cfn vsphere discover`. Skip the question when the user already chose, the devices were refreshed this session, or the task collects live data anyway.
