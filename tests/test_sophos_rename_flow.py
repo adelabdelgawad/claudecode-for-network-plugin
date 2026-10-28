@@ -134,6 +134,12 @@ def check_verify(fails):
     res = sophos_rename.verify_state(before, partial, [("a", "A")], False)
     if "FAIL" in levels(res) or "WARN" not in levels(res):
         fails.append(f"verify: an in-flight copy of a partial run is a WARN, not a FAIL: {res}")
+    # a resumed rename: the copy 'N' already followed 'o' before the run; afterwards only 'N' remains
+    rb = state(["x", "o", "N", "y"], {"G": ["o", "N"]})
+    rl = state(["x", "N", "y"], {"G": ["N"]})
+    res = sophos_rename.verify_state(rb, rl, [("o", "N")], True)
+    if set(levels(res)) != {"PASS"}:
+        fails.append(f"verify: a resumed rename (copy existed before the run) must be all PASS: {res}")
     old_backup = {k: v for k, v in before.items() if k != "FirewallRuleGroup"}
     res = sophos_rename.verify_state(old_backup, live, ren, True)
     if "WARN" not in levels(res) or "FAIL" in levels(res):
@@ -156,9 +162,46 @@ def check_create_plan(fails):
         fails.append("create_plan must not send anything and must write the rename file")
 
 
+def check_grouped_move_refused(fails):
+    """firewall_rule.move on a rule in a rule group is refused at plan time (SFOS ignores the position there)."""
+    groups = [base.grp("G", ["in-group"])]
+    move = [{"resource": "firewall_rule.move", "vars": {"name": "in-group", "position": "Top"}}]
+    if not base.raises(SystemExit, base.change.refuse_grouped_moves, [dict(base.DEV)], move, read=lambda d, e: groups):
+        fails.append("refuse_grouped_moves must refuse moving a grouped rule")
+    loose = [{"resource": "firewall_rule.move", "vars": {"name": "loose", "position": "Top"}}]
+    if base.raises(SystemExit, base.change.refuse_grouped_moves, [dict(base.DEV)], loose, read=lambda d, e: groups):
+        fails.append("refuse_grouped_moves must allow moving an ungrouped rule")
+
+
+def check_canary_plans_only_first(fails):
+    """--canary creates ONE plan (the canary) and saves the rest to a file; the rest is planned after the canary."""
+    fw = base.FakeFirewall(["u1", "g1", "g2"], groups={"G": ["g1", "g2"]}).install()
+    import argparse
+    import contextlib
+    import io
+    ns = argparse.Namespace(targets=[base.DEV["hostname"]], match=[], role=None, all=False, status="active",
+                            canary=True, title="t", file=None, from_report=None)
+    rows = [{"old": o, "new": n, "group": g, "ok": True, "verdict": "ok", "pos": i + 1, "status": "Enable"}
+            for i, (o, n, g) in enumerate([("u1", "U1", ""), ("g1", "G1", "G"), ("g2", "G2", "G")])]
+    real = (sophos_rename.sophos_api.resolve_firewalls, sophos_rename.check_firewall)
+    sophos_rename.sophos_api.resolve_firewalls = lambda a: [dict(base.DEV)]
+    sophos_rename.check_firewall = lambda a, d: (rows, None)
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            sophos_rename.cmd_plan(ns)
+    finally:
+        sophos_rename.sophos_api.resolve_firewalls, sophos_rename.check_firewall = real
+        fw.uninstall()
+    text = out.getvalue()
+    if text.count("PLAN CHG-") != 1 or "REST: 1 rename(s)" not in text:
+        fails.append(f"--canary must create only the canary plan and save the rest: {text}")
+
+
 def main():
     fails = []
-    for fn in (check_report, check_assess, check_canary, check_verify, check_create_plan):
+    for fn in (check_report, check_assess, check_canary, check_verify, check_create_plan, check_grouped_move_refused,
+               check_canary_plans_only_first):
         fn(fails)
     for f in fails:
         print("FAIL", f)

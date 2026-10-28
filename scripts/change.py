@@ -212,7 +212,25 @@ def plan_sophos_xml(args):
     steps = load_json(args.sophos_steps)
     if steps is None:
         raise SystemExit(f"cannot read the steps file {args.sophos_steps}")
-    return plan_sophos_steps(args, resolve_sophos_targets(args, "sophos steps"), steps)
+    devs = resolve_sophos_targets(args, "sophos steps")
+    refuse_grouped_moves(devs, steps)
+    return plan_sophos_steps(args, devs, steps)
+
+
+def refuse_grouped_moves(devs, steps, read=None):
+    """SFOS ignores <Position> on a rule that sits in a rule group and drops it from the group (seen on SFOS 21).
+    A grouped rule is moved by reordering its group: firewall_rule_group.update with the members in the new order."""
+    moves = [s["vars"].get("name") for s in steps if s.get("resource") == "firewall_rule.move"]
+    if not moves:
+        return
+    read = read or read_entity
+    for dev in devs:
+        for g in read(dev, "FirewallRuleGroup"):
+            hit = [m for m in moves if m in sophos_api.group_members(g)]
+            if hit:
+                raise SystemExit(f"{dev['hostname']}: {hit} in rule group {g.findtext('Name')!r}: firewall_rule.move "
+                                 "does not work on grouped rules; use firewall_rule_group.update with the members "
+                                 "in the new order")
 
 
 def rename_steps(pairs, groups):
